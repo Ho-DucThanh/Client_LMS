@@ -37,9 +37,9 @@ export default function NewCoursePage() {
     <RoleGuard roles={["ROLE_TEACHER", "ROLE_ADMIN"]}>
       <div className="min-h-screen bg-gray-50">
         <Heading
-          title="Create Course"
-          description="Build a new course"
-          keywords="course,new"
+          title="Tạo khóa học"
+          description="Xây dựng một khóa học mới"
+          keywords="khoa hoc,tao moi"
         />
         <Header />
         <div className="container mx-auto px-4 py-8">

@@ -30,7 +30,15 @@ export default function AssignmentPage() {
       try {
         const res = await assignmentService.getAssignment(assignmentId);
         const a = (res as any).data || res;
-        setAssignment(a);
+        // Compute overdue flag with server-provided value as primary, fallback to client-side calc
+        const dueRaw = a?.dueDate || a?.due_date || a?.due_at || a?.deadline;
+        const dueMs = dueRaw ? Date.parse(dueRaw) : NaN;
+        const computedOverdue = Number.isFinite(dueMs) && Date.now() > dueMs;
+        const normalized = {
+          ...a,
+          overdue: Boolean(a?.overdue ?? computedOverdue),
+        };
+        setAssignment(normalized);
         if (a?.lesson_id) {
           try {
             const lr = await lessonService.getLesson(a.lesson_id);
@@ -52,8 +60,20 @@ export default function AssignmentPage() {
     setFile(f);
   };
 
+  const isOverdue = (a: any | null) => {
+    if (!a) return false;
+    if (a.overdue) return true;
+    const d = a.dueDate || a.due_date || a.due_at || a.deadline;
+    const ms = d ? Date.parse(d) : NaN;
+    return Number.isFinite(ms) && Date.now() > ms;
+  };
+
   const handleSubmit = async () => {
     if (!assignment) return;
+    if (isOverdue(assignment)) {
+      toast.error("Bài tập đã quá hạn, không thể nộp.");
+      return;
+    }
     setSubmitting(true);
     try {
       // for file upload submissions, upload file first and send file_url
@@ -69,15 +89,23 @@ export default function AssignmentPage() {
           (upl as any).file_url ||
           (upl as any)?.data?.url ||
           upl;
-        await assignmentService.submitAssignment(assignment.id, {
+        const resp = await assignmentService.submitAssignment(assignment.id, {
           file_url: fileUrl,
         });
+        if (resp && resp.success === false && resp.canSubmit === false) {
+          toast.error(resp.message || "Bài tập đã quá hạn, không thể nộp.");
+          return;
+        }
       } else {
         // ESSAY, CODE, MULTIPLE_CHOICE (for MCQ we send content string or JSON?)
         // For simplicity, send answer in 'content' field as string
-        await assignmentService.submitAssignment(assignment.id, {
+        const resp = await assignmentService.submitAssignment(assignment.id, {
           content: answerText,
         });
+        if (resp && resp.success === false && resp.canSubmit === false) {
+          toast.error(resp.message || "Bài tập đã quá hạn, không thể nộp.");
+          return;
+        }
       }
       toast.success("Submission uploaded successfully");
       router.back();
@@ -136,6 +164,7 @@ export default function AssignmentPage() {
                     className="w-full border rounded p-2 mt-3"
                     rows={8}
                     placeholder="Type your answer here..."
+                    disabled={isOverdue(assignment)}
                   />
                 </div>
               )}
@@ -154,6 +183,7 @@ export default function AssignmentPage() {
                     className="w-full border rounded p-2 mt-3"
                     rows={12}
                     placeholder="Paste your code or provide a link to your repository..."
+                    disabled={isOverdue(assignment)}
                   />
                 </div>
               )}
@@ -173,6 +203,7 @@ export default function AssignmentPage() {
                                 type="radio"
                                 name={`mcq-${qi}`}
                                 value={opt}
+                                disabled={isOverdue(assignment)}
                                 onChange={() =>
                                   setAnswerText(
                                     JSON.stringify({
@@ -197,16 +228,26 @@ export default function AssignmentPage() {
                   <div className="text-sm text-gray-600 mb-2">
                     Attach a file
                   </div>
-                  <input type="file" onChange={handleFileChange} />
+                  <input
+                    type="file"
+                    onChange={handleFileChange}
+                    disabled={isOverdue(assignment)}
+                  />
                 </div>
               )}
             </div>
 
+            {isOverdue(assignment) && (
+              <div className="mb-4 p-3 rounded border border-red-200 bg-red-50 text-red-700 text-sm">
+                Bài tập đã quá hạn nộp, bạn không thể nộp bài.
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
               <button
                 onClick={handleSubmit}
-                disabled={submitting}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                disabled={submitting || isOverdue(assignment)}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? "Submitting..." : "Submit Assignment"}
               </button>

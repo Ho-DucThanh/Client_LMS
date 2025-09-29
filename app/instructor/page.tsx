@@ -118,9 +118,9 @@ export default function InstructorDashboard() {
     <RoleGuard roles={["ROLE_TEACHER", "ROLE_ADMIN"]}>
       <div className="min-h-screen bg-gray-50">
         <Heading
-          title="Instructor Dashboard - ELearning"
-          description="Manage your courses, modules, and lessons"
-          keywords="instructor, teacher, dashboard"
+          title="Bảng điều khiển Giảng viên - ELearning"
+          description="Quản lý khóa học, mô-đun và bài học của bạn"
+          keywords="giang vien, giao vien, bang dieu khien"
         />
         <Header />
 
@@ -128,24 +128,24 @@ export default function InstructorDashboard() {
           {/* Top stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm text-gray-500">Courses</div>
+              <div className="text-sm text-gray-500">Khóa học</div>
               <div className="text-3xl font-bold">{myCourses.length}</div>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm text-gray-500">Students</div>
+              <div className="text-sm text-gray-500">Học viên</div>
               <div className="text-3xl font-bold">{totalStudents}</div>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm text-gray-500">Approval</div>
+              <div className="text-sm text-gray-500">Phê duyệt</div>
               <div className="flex gap-4 mt-2 text-sm">
                 <div className="text-yellow-700">
-                  Pending: {approvalSummary.pending}
+                  Chờ duyệt: {approvalSummary.pending}
                 </div>
                 <div className="text-green-700">
-                  Approved: {approvalSummary.approved}
+                  Đã duyệt: {approvalSummary.approved}
                 </div>
                 <div className="text-red-700">
-                  Rejected: {approvalSummary.rejected}
+                  Từ chối: {approvalSummary.rejected}
                 </div>
               </div>
             </div>
@@ -154,7 +154,9 @@ export default function InstructorDashboard() {
           {/* My courses list and selection */}
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-gray-900">My Courses</h1>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Khóa học của tôi
+              </h1>
             </div>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {(myCourses || []).map((c) => (
@@ -169,7 +171,7 @@ export default function InstructorDashboard() {
                 >
                   <div className="font-semibold text-gray-900">{c.title}</div>
                   <div className="text-sm text-gray-600">
-                    Enrolled: {c.total_enrolled ?? "-"}
+                    Ghi danh: {c.total_enrolled ?? "-"}
                   </div>
                   <div className="text-xs mt-1">
                     <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 mr-2">
@@ -196,7 +198,7 @@ export default function InstructorDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Modules & Lessons
+                  Mô-đun & Bài học
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {modules.map((m) => (
@@ -205,11 +207,11 @@ export default function InstructorDashboard() {
                         {m.title}
                       </div>
                       <div className="text-sm text-gray-500">
-                        Order #{m.order_index ?? "-"}
+                        Thứ tự #{m.order_index ?? "-"}
                       </div>
                       <div className="mt-3">
                         <div className="text-sm font-medium text-gray-700 mb-1">
-                          Lessons
+                          Bài học
                         </div>
                         <ul className="space-y-2">
                           {lessons
@@ -232,31 +234,31 @@ export default function InstructorDashboard() {
 
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Enrollment Stats
+                  Thống kê ghi danh
                 </h2>
                 {enrollStats ? (
                   <>
                     <div className="space-y-2 text-sm mb-4">
                       <div className="flex justify-between">
-                        <span>Total</span>
+                        <span>Tổng</span>
                         <span className="font-semibold">
                           {enrollStats.total}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Active</span>
+                        <span>Đang học</span>
                         <span className="font-semibold text-green-600">
                           {enrollStats.active}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Completed</span>
+                        <span>Hoàn thành</span>
                         <span className="font-semibold text-blue-600">
                           {enrollStats.completed}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Dropped</span>
+                        <span>Đã hủy</span>
                         <span className="font-semibold text-red-600">
                           {enrollStats.dropped}
                         </span>
@@ -266,9 +268,12 @@ export default function InstructorDashboard() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={[
-                            { name: "Active", value: enrollStats.active },
-                            { name: "Completed", value: enrollStats.completed },
-                            { name: "Dropped", value: enrollStats.dropped },
+                            { name: "Đang học", value: enrollStats.active },
+                            {
+                              name: "Hoàn thành",
+                              value: enrollStats.completed,
+                            },
+                            { name: "Đã hủy", value: enrollStats.dropped },
                           ]}
                         >
                           <XAxis dataKey="name" />
@@ -280,7 +285,7 @@ export default function InstructorDashboard() {
                     </div>
                   </>
                 ) : (
-                  <div className="text-gray-600">No stats</div>
+                  <div className="text-gray-600">Không có thống kê</div>
                 )}
               </div>
             </div>
@@ -289,11 +294,13 @@ export default function InstructorDashboard() {
         {/* Approval notifications */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-3">
-            Approval Notifications
+            Thông báo phê duyệt
           </h2>
           {myCourses.filter((c) => c.approval_status !== "APPROVED").length ===
           0 ? (
-            <div className="text-gray-600 text-sm">All courses approved.</div>
+            <div className="text-gray-600 text-sm">
+              Tất cả khóa học đã được phê duyệt.
+            </div>
           ) : (
             <ul className="space-y-2 text-sm">
               {myCourses
@@ -306,14 +313,14 @@ export default function InstructorDashboard() {
                     <div>
                       <div className="font-medium text-gray-900">{c.title}</div>
                       <div className="text-gray-600">
-                        Status: {c.approval_status}
+                        Trạng thái: {c.approval_status}
                       </div>
                     </div>
                     <a
                       href={`/instructor/courses/${c.id}/edit`}
                       className="text-blue-600 hover:underline"
                     >
-                      Review
+                      Xem xét
                     </a>
                   </li>
                 ))}

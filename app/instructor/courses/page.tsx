@@ -125,19 +125,21 @@ export default function InstructorCoursesPage() {
     <RoleGuard roles={["ROLE_TEACHER", "ROLE_ADMIN"]}>
       <div className="min-h-screen bg-gray-50">
         <Heading
-          title="Manage Courses"
-          description="Create and manage your courses"
-          keywords="instructor,courses,manage"
+          title="Quản lý khóa học"
+          description="Tạo và quản lý các khóa học của bạn"
+          keywords="giang vien,khoa hoc,quan ly"
         />
         <Header />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">My Courses</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Khóa học của tôi
+            </h1>
             <button
               onClick={() => router.push("/instructor/courses/new")}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
             >
-              Create Course
+              Tạo khóa học
             </button>
           </div>
 
@@ -146,43 +148,43 @@ export default function InstructorCoursesPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
-                  Search
+                  Tìm kiếm
                 </label>
                 <input
                   className="w-full px-3 py-2 border rounded"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search title/description"
+                  placeholder="Tìm tiêu đề/mô tả"
                 />
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
-                  Status
+                  Trạng thái
                 </label>
                 <select
                   className="w-full px-3 py-2 border rounded"
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
                 >
-                  <option value="">All</option>
-                  <option value="DRAFT">Draft</option>
-                  <option value="PUBLISHED">Published</option>
-                  <option value="ARCHIVED">Archived</option>
+                  <option value="">Tất cả</option>
+                  <option value="DRAFT">Bản nháp</option>
+                  <option value="PUBLISHED">Đã xuất bản</option>
+                  <option value="ARCHIVED">Lưu trữ</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
-                  Approval
+                  Phê duyệt
                 </label>
                 <select
                   className="w-full px-3 py-2 border rounded"
                   value={approval}
                   onChange={(e) => setApproval(e.target.value as any)}
                 >
-                  <option value="">All</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="APPROVED">Approved</option>
-                  <option value="REJECTED">Rejected</option>
+                  <option value="">Tất cả</option>
+                  <option value="PENDING">Chờ duyệt</option>
+                  <option value="APPROVED">Đã duyệt</option>
+                  <option value="REJECTED">Từ chối</option>
                 </select>
               </div>
               <div className="flex items-end">
@@ -194,7 +196,7 @@ export default function InstructorCoursesPage() {
                   }}
                   className="px-4 py-2 border rounded"
                 >
-                  Clear
+                  Xóa bộ lọc
                 </button>
               </div>
             </div>
@@ -207,7 +209,7 @@ export default function InstructorCoursesPage() {
             </div>
           ) : courses.length === 0 ? (
             <div className="bg-white rounded p-8 text-center text-gray-600">
-              No courses found.
+              Không tìm thấy khóa học nào.
             </div>
           ) : (
             <>
@@ -235,7 +237,7 @@ export default function InstructorCoursesPage() {
                         ) : null}
                         {isPopular && (
                           <span className="absolute top-3 left-3 text-xs font-semibold bg-orange-500 text-white px-2 py-1 rounded-md shadow">
-                            Popular
+                            Phổ biến
                           </span>
                         )}
                       </div>
@@ -300,7 +302,7 @@ export default function InstructorCoursesPage() {
                         <div className="mt-3 flex items-center gap-4 text-xs text-gray-600">
                           <span className="inline-flex items-center gap-1">
                             <ClockIcon className="h-4 w-4" />
-                            {c.duration_hours ?? 0} hours
+                            {c.duration_hours ?? 0} giờ
                           </span>
                           <span className="inline-flex items-center gap-1">
                             <UserGroupIcon className="h-4 w-4" />
@@ -368,13 +370,13 @@ export default function InstructorCoursesPage() {
                             href={`/instructor/courses/${c.id}/manage`}
                             className="col-span-2 md:col-span-1 inline-flex items-center justify-center rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700"
                           >
-                            Manage
+                            Quản lý
                           </Link>
                           <Link
                             href={`/instructor/courses/${c.id}/enrollments`}
                             className="inline-flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 px-4 py-2 text-sm hover:bg-gray-50"
                           >
-                            Students
+                            Học viên
                           </Link>
                           <button
                             onClick={() =>
@@ -382,22 +384,22 @@ export default function InstructorCoursesPage() {
                             }
                             className="inline-flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 px-4 py-2 text-sm hover:bg-gray-50"
                           >
-                            Edit
+                            Chỉnh sửa
                           </button>
                           <button
                             onClick={() => deleteCourse(c.id)}
                             className="inline-flex items-center justify-center rounded-lg border border-red-200 text-red-600 px-4 py-2 text-sm hover:bg-red-50"
                           >
-                            Delete
+                            Xóa
                           </button>
 
                           {c.status === "PUBLISHED" ? (
                             <button
                               className="col-span-2 inline-flex items-center justify-center rounded-lg bg-green-600 text-white px-4 py-2 text-sm font-medium opacity-70 cursor-not-allowed"
                               disabled
-                              title="This course is already published"
+                              title="Khóa học này đã được xuất bản"
                             >
-                              Published
+                              Đã xuất bản
                             </button>
                           ) : (
                             <button
@@ -406,11 +408,11 @@ export default function InstructorCoursesPage() {
                               disabled={c.approval_status !== "APPROVED"}
                               title={
                                 c.approval_status !== "APPROVED"
-                                  ? "Approve first"
-                                  : "Publish course"
+                                  ? "Cần được phê duyệt trước"
+                                  : "Xuất bản khóa học"
                               }
                             >
-                              Publish
+                              Xuất bản
                             </button>
                           )}
                         </div>
@@ -427,7 +429,7 @@ export default function InstructorCoursesPage() {
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
                   >
-                    Previous
+                    Trước
                   </button>
                   {Array.from({ length: totalPages }).map((_, idx) => (
                     <button
@@ -446,7 +448,7 @@ export default function InstructorCoursesPage() {
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
                   >
-                    Next
+                    Sau
                   </button>
                 </div>
               )}

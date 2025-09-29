@@ -1,11 +1,22 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Heading from "../../../../../../utils/Heading";
 import Header from "../../../../../../components/Header";
 import { assignmentService } from "../../../../../../services/api-assignment";
 import { enrollmentService } from "../../../../../../services/api-enrollment";
 import toast from "react-hot-toast";
+import Link from "next/link";
+import {
+  BookOpen,
+  ClipboardList,
+  CheckCircle2,
+  CircleAlert,
+  Clock3,
+  Layers,
+  User2,
+  FileText,
+} from "lucide-react";
 
 export default function StudentSubmissionsPage() {
   const params = useParams() as { id: string; enrollmentId: string };
@@ -24,38 +35,50 @@ export default function StudentSubmissionsPage() {
   const [filter, setFilter] = useState<
     "ALL" | "SUBMITTED" | "NOT_SUBMITTED" | "UN_GRADED"
   >("ALL");
+  const [enrollment, setEnrollment] = useState<any | null>(null);
 
   useEffect(() => {
     if (!courseId || !studentId) return;
     (async () => {
       setLoading(true);
       try {
-        const aRes = await assignmentService.getAssignments(courseId, {
-          page,
-          limit,
-          sortBy: "created_at",
-          order: "DESC",
-        });
+        const [aRes, sRes, enr] = await Promise.all([
+          assignmentService.getAssignments(courseId, {
+            page,
+            limit,
+            sortBy: "created_at",
+            order: "DESC",
+          }),
+          assignmentService.getSubmissionsByStudent(studentId),
+          enrollmentId
+            ? enrollmentService
+                .getEnrollmentProgress(enrollmentId)
+                .catch(() => null)
+            : Promise.resolve(null),
+        ]);
+
         const resp = (aRes as any) || {};
         const assignmentsList = Array.isArray(resp) ? resp : resp.data || [];
         setAssignments(Array.isArray(assignmentsList) ? assignmentsList : []);
         setTotal(resp.total || 0);
         setTotalPages(resp.totalPages || 1);
 
-        const sRes = await assignmentService.getSubmissionsByStudent(studentId);
         const submissions = (sRes as any).data || sRes || [];
         const map: Record<number, any> = {};
         (Array.isArray(submissions) ? submissions : []).forEach((sub: any) => {
           map[sub.assignment_id] = sub;
         });
         setSubmissionsMap(map);
+
+        const enrObj = (enr as any)?.data || enr || null;
+        setEnrollment(enrObj);
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
     })();
-  }, [courseId, studentId, page, limit]);
+  }, [courseId, studentId, page, limit, enrollmentId]);
 
   // group assignments by module -> lesson for ordered display
   const grouped = React.useMemo(() => {
@@ -175,18 +198,126 @@ export default function StudentSubmissionsPage() {
     }
   };
 
+  const stats = useMemo(() => {
+    const totalAssignments = assignments.length;
+    let submitted = 0;
+    let graded = 0;
+    for (const a of assignments) {
+      const sub = submissionsMap[a.id];
+      if (sub) {
+        submitted += 1;
+        if (sub.status === "GRADED" || sub.grade != null) graded += 1;
+      }
+    }
+    const notSubmitted = Math.max(0, totalAssignments - submitted);
+    const ungraded = Math.max(0, submitted - graded);
+    return { totalAssignments, submitted, graded, ungraded, notSubmitted };
+  }, [assignments, submissionsMap]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Heading
-        title="Student Submissions"
-        description="Review and grade student submissions"
-        keywords={""}
+        title="Bài nộp của học viên"
+        description="Xem và chấm điểm bài nộp của học viên"
+        keywords={"bai nop,hoc vien"}
       />
       <Header />
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-white rounded shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Student submissions</h3>
-          {loading && <div className="text-sm text-gray-500">Loading…</div>}
+      <div className="container mx-auto px-4 py-8 space-y-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-semibold">
+                {(enrollment?.student?.first_name?.[0] || "S").toUpperCase()}
+              </div>
+              <div>
+                <div className="font-medium flex items-center gap-2">
+                  <User2 size={16} className="text-gray-500" />
+                  <span>
+                    {enrollment?.student?.first_name}{" "}
+                    {enrollment?.student?.last_name}
+                  </span>
+                </div>
+                {enrollment?.student?.email && (
+                  <div className="text-sm text-gray-500">
+                    {enrollment?.student?.email}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-gray-500 flex items-center justify-end gap-2">
+                <BookOpen size={16} className="text-gray-500" />
+                <span>Khóa học</span>
+              </div>
+              <div className="text-lg font-semibold">
+                {enrollment?.course?.title || "Bài tập của khóa học"}
+              </div>
+              <div className="text-xs text-gray-500">
+                <Link
+                  href={`/instructor/courses/${courseId}/enrollments`}
+                  className="text-blue-600 hover:underline"
+                >
+                  ← Quay lại danh sách ghi danh
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
+            <div className="rounded-lg border p-4 flex items-center gap-3">
+              <div className="p-2 rounded-md bg-gray-50 text-gray-700">
+                <ClipboardList size={18} />
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Tổng bài tập</div>
+                <div className="font-semibold">{stats.totalAssignments}</div>
+              </div>
+            </div>
+            <div className="rounded-lg border p-4 flex items-center gap-3">
+              <div className="p-2 rounded-md bg-blue-50 text-blue-600">
+                <FileText size={18} />
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Đã nộp</div>
+                <div className="font-semibold">{stats.submitted}</div>
+              </div>
+            </div>
+            <div className="rounded-lg border p-4 flex items-center gap-3">
+              <div className="p-2 rounded-md bg-amber-50 text-amber-600">
+                <Clock3 size={18} />
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Chưa chấm</div>
+                <div className="font-semibold">{stats.ungraded}</div>
+              </div>
+            </div>
+            <div className="rounded-lg border p-4 flex items-center gap-3">
+              <div className="p-2 rounded-md bg-emerald-50 text-emerald-600">
+                <CheckCircle2 size={18} />
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Đã chấm</div>
+                <div className="font-semibold">{stats.graded}</div>
+              </div>
+            </div>
+            <div className="rounded-lg border p-4 flex items-center gap-3">
+              <div className="p-2 rounded-md bg-red-50 text-red-600">
+                <CircleAlert size={18} />
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Chưa nộp</div>
+                <div className="font-semibold">{stats.notSubmitted}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <ClipboardList size={18} className="text-gray-500" />
+            Bài nộp của học viên
+          </h3>
+          {loading && <div className="text-sm text-gray-500">Đang tải…</div>}
           {!loading && (
             <div className="space-y-6">
               <div className="flex items-center justify-between gap-4">
@@ -196,56 +327,56 @@ export default function StudentSubmissionsPage() {
                       setFilter("ALL");
                       setPage(1);
                     }}
-                    className={`px-3 py-1 rounded ${
+                    className={`px-3 py-1 rounded-full text-sm ${
                       filter === "ALL"
                         ? "bg-blue-600 text-white"
                         : "bg-white text-gray-700 border"
                     }`}
                   >
-                    All
+                    Tất cả
                   </button>
                   <button
                     onClick={() => {
                       setFilter("SUBMITTED");
                       setPage(1);
                     }}
-                    className={`px-3 py-1 rounded ${
+                    className={`px-3 py-1 rounded-full text-sm ${
                       filter === "SUBMITTED"
                         ? "bg-blue-600 text-white"
                         : "bg-white text-gray-700 border"
                     }`}
                   >
-                    Submitted
+                    Đã nộp
                   </button>
                   <button
                     onClick={() => {
                       setFilter("NOT_SUBMITTED");
                       setPage(1);
                     }}
-                    className={`px-3 py-1 rounded ${
+                    className={`px-3 py-1 rounded-full text-sm ${
                       filter === "NOT_SUBMITTED"
                         ? "bg-blue-600 text-white"
                         : "bg-white text-gray-700 border"
                     }`}
                   >
-                    Not submitted
+                    Chưa nộp
                   </button>
                   <button
                     onClick={() => {
                       setFilter("UN_GRADED");
                       setPage(1);
                     }}
-                    className={`px-3 py-1 rounded ${
+                    className={`px-3 py-1 rounded-full text-sm ${
                       filter === "UN_GRADED"
                         ? "bg-blue-600 text-white"
                         : "bg-white text-gray-700 border"
                     }`}
                   >
-                    Ungraded
+                    Chưa chấm
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-600">Per page:</div>
+                  <div className="text-sm text-gray-600">Mỗi trang:</div>
                   <select
                     value={limit}
                     onChange={(e) => {
@@ -261,28 +392,37 @@ export default function StudentSubmissionsPage() {
                 </div>
               </div>
               {grouped.course && (
-                <div className="mb-2">
-                  <div className="text-sm text-gray-600">Course</div>
-                  <div className="font-semibold">{grouped.course.title}</div>
+                <div className="mb-4 p-3 rounded-md bg-gray-50 border text-sm text-gray-700 flex items-center gap-2">
+                  <BookOpen size={16} className="text-gray-500" />
+                  <span className="font-medium">{grouped.course.title}</span>
                 </div>
               )}
 
               {grouped.modules.map((m: any) => (
                 <div key={m.module.id}>
-                  <div className="text-sm text-gray-600">Module</div>
-                  <div className="font-medium mb-2">{m.module.title}</div>
+                  <div className="flex items-center gap-2 text-gray-700 mb-2">
+                    <Layers size={16} className="text-gray-500" />
+                    <div className="font-medium">{m.module.title}</div>
+                  </div>
                   {m.lessons.map((L: any) => (
                     <div key={L.lesson.id} className="mb-4">
-                      <div className="text-xs text-gray-500">Lesson</div>
-                      <div className="font-semibold">{L.lesson.title}</div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <BookOpen size={14} className="text-gray-400" />
+                        <div className="font-semibold text-gray-800">
+                          {L.lesson.title}
+                        </div>
+                      </div>
                       <div className="mt-2 space-y-3">
                         {L.assignments
                           .filter((a: any) => filterMatches(a))
                           .map((a: any) => {
                             const sub = submissionsMap[a.id];
                             return (
-                              <div key={a.id} className="border rounded p-4">
-                                <div className="flex justify-between items-start">
+                              <div
+                                key={a.id}
+                                className="border rounded p-4 hover:shadow-sm transition"
+                              >
+                                <div className="flex justify-between items-start gap-4">
                                   <div>
                                     <div className="font-medium flex items-center gap-3">
                                       <div
@@ -294,20 +434,37 @@ export default function StudentSubmissionsPage() {
                                       </div>
                                       <div>{a.title}</div>
                                     </div>
-                                    <div className="text-xs text-gray-500">
-                                      {a.type} • Due:{" "}
-                                      {a.due_date
-                                        ? new Date(a.due_date).toLocaleString()
-                                        : "—"}
+                                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+                                      <span className="px-2 py-0.5 rounded-full border bg-white">
+                                        {a.type || "Assignment"}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded-full border bg-white flex items-center gap-1">
+                                        <Clock3 size={12} />
+                                        {a.due_date
+                                          ? new Date(
+                                              a.due_date
+                                            ).toLocaleString()
+                                          : "Không hạn"}
+                                      </span>
                                     </div>
                                   </div>
-                                  <div className="text-sm text-right">
-                                    <div>
-                                      {sub
-                                        ? sub.grade != null
-                                          ? `${sub.grade}`
-                                          : "Not graded"
-                                        : "No submission"}
+                                  <div className="text-sm text-right min-w-36">
+                                    <div className="mb-1">
+                                      {sub ? (
+                                        sub.grade != null ? (
+                                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">
+                                            Điểm: {sub.grade}
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                                            Chưa chấm
+                                          </span>
+                                        )
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                          Chưa nộp
+                                        </span>
+                                      )}
                                     </div>
                                     {sub && (
                                       <div className="text-xs text-gray-500">
@@ -334,24 +491,24 @@ export default function StudentSubmissionsPage() {
                                             href={sub.file_url}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="text-blue-600"
+                                            className="text-blue-600 hover:underline"
                                           >
-                                            Download file
+                                            Tải tệp đính kèm
                                           </a>
                                         </div>
                                       )}
                                       <div className="mt-2">
                                         <button
                                           onClick={() => openGrade(sub)}
-                                          className="px-3 py-1 rounded bg-blue-600 text-white text-sm"
+                                          className="px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
                                         >
-                                          Grade
+                                          Chấm điểm
                                         </button>
                                       </div>
                                     </div>
                                   ) : (
                                     <div className="text-sm text-gray-500">
-                                      Student has not submitted this assignment.
+                                      Học viên chưa nộp bài tập này.
                                     </div>
                                   )}
                                 </div>
@@ -364,24 +521,24 @@ export default function StudentSubmissionsPage() {
                 </div>
               ))}
               <div className="mt-4 flex items-center justify-between">
-                <div className="text-sm text-gray-600">Total: {total}</div>
+                <div className="text-sm text-gray-600">Tổng: {total}</div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={onPrev}
                     disabled={page <= 1}
-                    className="px-3 py-1 border rounded disabled:opacity-50"
+                    className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-50"
                   >
-                    Prev
+                    Trước
                   </button>
                   <div className="px-3">
-                    Page {page} / {totalPages}
+                    Trang {page} / {totalPages}
                   </div>
                   <button
                     onClick={onNext}
                     disabled={page >= totalPages}
-                    className="px-3 py-1 border rounded disabled:opacity-50"
+                    className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-50"
                   >
-                    Next
+                    Sau
                   </button>
                 </div>
               </div>
@@ -393,9 +550,9 @@ export default function StudentSubmissionsPage() {
       {grading.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white p-4 rounded w-96">
-            <h4 className="font-semibold mb-2">Grade submission</h4>
+            <h4 className="font-semibold mb-2">Chấm điểm bài nộp</h4>
             <div className="mb-2">
-              <label className="block text-xs text-gray-600">Grade</label>
+              <label className="block text-xs text-gray-600">Điểm</label>
               <input
                 type="number"
                 value={gradeValue as any}
@@ -408,7 +565,7 @@ export default function StudentSubmissionsPage() {
               />
             </div>
             <div className="mb-2">
-              <label className="block text-xs text-gray-600">Feedback</label>
+              <label className="block text-xs text-gray-600">Nhận xét</label>
               <textarea
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
@@ -420,13 +577,13 @@ export default function StudentSubmissionsPage() {
                 onClick={() => setGrading({ open: false })}
                 className="px-3 py-1 rounded border"
               >
-                Cancel
+                Hủy
               </button>
               <button
                 onClick={submitGrade}
                 className="px-3 py-1 rounded bg-green-600 text-white"
               >
-                Save
+                Lưu
               </button>
             </div>
           </div>

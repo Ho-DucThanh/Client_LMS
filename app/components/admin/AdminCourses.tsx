@@ -77,7 +77,7 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({
   return (
     <div>
       <h3 className="text-lg font-semibold text-gray-900 mb-6">
-        Course Management
+        Quản lý khóa học
       </h3>
 
       {/* Sub-tabs by approval status */}
@@ -97,7 +97,11 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
               >
-                {tab}
+                {tab === "PENDING"
+                  ? "Chờ duyệt"
+                  : tab === "APPROVED"
+                  ? "Đã duyệt"
+                  : "Từ chối"}
               </button>
             ))}
           </nav>
@@ -106,7 +110,7 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({
 
       <div className="space-y-4">
         {filteredCourses.length === 0 && (
-          <div className="text-sm text-gray-500">No courses found.</div>
+          <div className="text-sm text-gray-500">Không tìm thấy khóa học.</div>
         )}
         {filteredCourses.map((course) => (
           <div
@@ -119,7 +123,7 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({
                   {course.title}
                 </h4>
                 <p className="text-gray-600">
-                  Instructor: {getInstructorName(course)}
+                  Giảng viên: {getInstructorName(course)}
                 </p>
                 <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                   <span>
@@ -127,7 +131,7 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({
                       course.total_enrolled ??
                       course.enrollments?.length ??
                       0}{" "}
-                    students enrolled
+                    lượt ghi danh
                   </span>
                   <span
                     className={`px-2 py-1 rounded-full ${
@@ -138,7 +142,11 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({
                         : "bg-yellow-100 text-yellow-800"
                     }`}
                   >
-                    {getApprovalStatus(course)}
+                    {getApprovalStatus(course) === "APPROVED"
+                      ? "Đã duyệt"
+                      : getApprovalStatus(course) === "REJECTED"
+                      ? "Từ chối"
+                      : "Chờ duyệt"}
                   </span>
                   <span
                     className={`px-2 py-1 rounded-full ${
@@ -148,11 +156,11 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({
                     }`}
                   >
                     {course.isPublished ?? course.status === "PUBLISHED"
-                      ? "Published"
-                      : "Draft"}
+                      ? "Đã xuất bản"
+                      : "Bản nháp"}
                   </span>
                   <span>
-                    Created{" "}
+                    Tạo ngày {""}
                     {new Date(
                       (course.created_at as any) || (course.createdAt as any)
                     ).toLocaleDateString()}
@@ -166,33 +174,21 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({
                     <button
                       onClick={() => onApprove && onApprove(course.id)}
                       className="p-2 text-green-600 hover:text-green-700 flex items-center gap-1"
-                      title="Approve Course"
+                      title="Duyệt khóa học"
                     >
                       <CheckCircleIcon className="h-5 w-5" />
-                      Approve
+                      Duyệt
                     </button>
                     <button
                       onClick={() => onReject && onReject(course.id)}
                       className="p-2 text-red-600 hover:text-red-700 flex items-center gap-1"
-                      title="Reject Course"
+                      title="Từ chối khóa học"
                     >
                       <XCircleIcon className="h-5 w-5" />
-                      Reject
+                      Từ chối
                     </button>
                   </>
                 )}
-                <button
-                  className="p-2 text-gray-400 hover:text-blue-600"
-                  title="View Course"
-                >
-                  <EyeIcon className="h-5 w-5" />
-                </button>
-                <button
-                  className="p-2 text-gray-400 hover:text-red-600"
-                  title="Remove Course"
-                >
-                  <TrashIcon className="h-5 w-5" />
-                </button>
               </div>
             </div>
           </div>
@@ -201,7 +197,7 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({
         {totalPages > 1 && (
           <div className="flex items-center justify-between pt-4">
             <div className="text-sm text-gray-600">
-              Page {page} of {totalPages}
+              Trang {page} / {totalPages}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -211,7 +207,7 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({
                 }
                 disabled={page <= 1}
               >
-                Previous
+                Trước
               </button>
               <button
                 className="px-3 py-1 border rounded disabled:opacity-50"
@@ -220,7 +216,7 @@ const AdminCourses: React.FC<AdminCoursesProps> = ({
                 }
                 disabled={page >= totalPages}
               >
-                Next
+                Sau
               </button>
             </div>
           </div>

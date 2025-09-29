@@ -32,10 +32,11 @@ const LoginPage = () => {
           router.push("/dashboard");
         }
       } else {
-        setError("Invalid email or password");
+        setError("Sai tài khoản hoặc mật khẩu");
       }
     } catch (error) {
-      setError("Login failed. Please try again.");
+      // Fallback message; AuthContext already handles errors quietly
+      setError("Sai tài khoản hoặc mật khẩu");
     } finally {
       setIsLoading(false);
     }

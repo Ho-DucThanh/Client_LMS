@@ -55,14 +55,14 @@ const LessonForm: React.FC<LessonFormProps> = ({
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-800">
-            Create / Edit Lesson
+            Tạo / Chỉnh sửa bài học
           </h3>
           <p className="text-sm text-gray-500">
-            Add lesson details and optionally upload a video
+            Thêm thông tin bài học và tùy chọn tải video
           </p>
         </div>
         <div className="text-sm text-gray-500">
-          Duration: {lessonDuration || 0} min
+          Thời lượng: {lessonDuration || 0} phút
         </div>
       </div>
       {creating && (
@@ -96,14 +96,14 @@ const LessonForm: React.FC<LessonFormProps> = ({
         <input
           value={lessonTitle}
           onChange={(e) => setLessonTitle(e.target.value)}
-          placeholder="Lesson title"
+          placeholder="Tiêu đề bài học"
           className="border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white"
           disabled={creating}
         />
         <input
           value={lessonDescription}
           onChange={(e) => setLessonDescription(e.target.value)}
-          placeholder="Lesson description"
+          placeholder="Mô tả bài học"
           className="border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white"
           disabled={creating}
         />
@@ -125,7 +125,7 @@ const LessonForm: React.FC<LessonFormProps> = ({
           type="number"
           value={lessonDuration}
           onChange={(e) => setLessonDuration(Number(e.target.value))}
-          placeholder="Duration (minutes)"
+          placeholder="Thời lượng (phút)"
           className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-100"
           disabled={creating}
         />
@@ -134,7 +134,7 @@ const LessonForm: React.FC<LessonFormProps> = ({
         <textarea
           value={lessonContent}
           onChange={(e) => setLessonContent(e.target.value)}
-          placeholder="Lesson content (markdown/html)"
+          placeholder="Nội dung bài học (markdown/html)"
           className="border border-gray-200 rounded-md px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white"
           rows={4}
           disabled={creating}
@@ -150,7 +150,7 @@ const LessonForm: React.FC<LessonFormProps> = ({
               className="hidden"
               disabled={creating}
             />
-            <span className="text-sm text-gray-700">Upload video</span>
+            <span className="text-sm text-gray-700">Tải video</span>
           </label>
           {lessonVideoUrl && (
             <div className="mt-3">
@@ -178,7 +178,7 @@ const LessonForm: React.FC<LessonFormProps> = ({
             className="rounded"
             disabled={creating}
           />
-          <span className="text-gray-700">Free lesson</span>
+          <span className="text-gray-700">Bài học miễn phí</span>
         </label>
         <button
           onClick={onSubmit}
@@ -207,10 +207,10 @@ const LessonForm: React.FC<LessonFormProps> = ({
                   d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
                 ></path>
               </svg>
-              Saving...
+              Đang lưu...
             </>
           ) : (
-            "Save"
+            "Lưu"
           )}
         </button>
         <button
@@ -218,7 +218,7 @@ const LessonForm: React.FC<LessonFormProps> = ({
           className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md"
           disabled={creating}
         >
-          Cancel
+          Hủy
         </button>
       </div>
     </div>

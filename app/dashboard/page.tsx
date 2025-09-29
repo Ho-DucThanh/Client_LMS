@@ -1,33 +1,55 @@
 "use client";
-import React, { useState, useEffect, useContext, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  BookOpenIcon,
-  ClockIcon,
-  CheckCircleIcon,
-  ChartBarIcon,
   AcademicCapIcon,
+  BookOpenIcon,
+  ChartBarIcon,
+  CheckCircleIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 import Heading from "../utils/Heading";
 import Header from "../components/Header";
+import LearningPath from "../components/LearningPath"; // legacy (may keep for fallback)
+import LearningPathSplit from "../components/LearningPathSplit";
 import { useAuth } from "../contexts/AuthContext";
 import { enrollmentService } from "../services/api-enrollment";
 import { courseService } from "../services/api-course";
+import { reportsService } from "../services/api-reports";
 import { Enrollment } from "../types";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
+  const role: string = (user?.role as unknown as string) || "";
   const router = useRouter();
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  // pagination for My Courses (student)
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(6); // items per page
+  const searchParams = useSearchParams();
+
+  const [isMounted, setIsMounted] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState<string>("overview");
+
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(6);
+
+  const [reports, setReports] = useState<any>(null);
+  const [trends, setTrends] = useState<any>(null);
+  const [trendParams, setTrendParams] = useState<{
+    from: string;
+    to: string;
+    interval: "day" | "month";
+  }>(() => {
+    const to = new Date();
+    const from = new Date(to.getTime() - 30 * 24 * 3600 * 1000);
+    const fmt = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate()
+      ).padStart(2, "0")}`;
+    return { from: fmt(from), to: fmt(to), interval: "day" };
+  });
+
   const [myCoursesCount, setMyCoursesCount] = useState<number>(0);
-  // Teacher specific
-  const [teacherCourses, setTeacherCourses] = useState<any[]>([]);
   const [teacherStats, setTeacherStats] = useState({
     totalStudents: 0,
     active: 0,
@@ -38,11 +60,20 @@ export default function StudentDashboard() {
   const [pendingEnrollments, setPendingEnrollments] = useState<any[]>([]);
 
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    const tab = searchParams?.get("tab");
+    if (tab && typeof tab === "string") setActiveTab(tab);
+  }, [isMounted, searchParams]);
+
+  useEffect(() => {
     if (!user) {
       setLoading(false);
       return;
     }
-    // Admins go straight to /admin
     if (user.role === "ROLE_ADMIN") {
       router.replace("/admin");
       setLoading(false);
@@ -54,28 +85,31 @@ export default function StudentDashboard() {
     }
     if (user.role === "ROLE_TEACHER") {
       loadTeacherOverview();
+      loadReports("teacher");
       return;
     }
     setLoading(false);
   }, [user]);
 
-  // Reload enrollments when the user returns to the tab (help reflect progress updates)
   useEffect(() => {
     if (user?.role !== "ROLE_STUDENT") return;
     const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        loadEnrollments();
-      }
+      if (document.visibilityState === "visible") loadEnrollments();
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [user]);
 
+  useEffect(() => {
+    if (activeTab === "reports" && role === "ROLE_TEACHER" && !reports) {
+      loadReports("teacher");
+    }
+  }, [activeTab, role]);
+
   const loadTeacherOverview = async () => {
     try {
       const res = await courseService.getMyCourses();
       const courses = ((res as any).data || res || []) as any[];
-      setTeacherCourses(courses);
       setMyCoursesCount(Array.isArray(courses) ? courses.length : 0);
 
       let total = 0,
@@ -92,7 +126,7 @@ export default function StudentDashboard() {
           active += Number(s.active || 0);
           completed += Number(s.completed || 0);
           dropped += Number(s.dropped || 0);
-        } catch (e) {}
+        } catch {}
         try {
           const eRes = await enrollmentService.getCourseEnrollments(c.id);
           const list = ((eRes as any).data || eRes || []) as any[];
@@ -101,7 +135,7 @@ export default function StudentDashboard() {
           pendings.forEach((e) =>
             pendingList.push({ ...e, course_title: c.title })
           );
-        } catch (e) {}
+        } catch {}
       }
       setTeacherStats({
         totalStudents: total,
@@ -111,7 +145,6 @@ export default function StudentDashboard() {
         pending,
       });
       setPendingEnrollments(pendingList);
-    } catch (e) {
     } finally {
       setLoading(false);
     }
@@ -122,41 +155,89 @@ export default function StudentDashboard() {
       const response = await enrollmentService.getMyEnrollments();
       const list = (response as any).data || response || [];
       setEnrollments(Array.isArray(list) ? list : []);
-    } catch (error) {
-      console.error("Error loading enrollments:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDropCourse = async (courseId: number) => {
-    if (!confirm("Are you sure you want to drop this course?")) return;
-
+  const loadReports = async (r: "admin" | "teacher") => {
     try {
-      await enrollmentService.dropCourse(courseId);
-      alert("Course dropped successfully!");
-      loadEnrollments(); // Refresh enrollments
-    } catch (error) {
-      console.error("Error dropping course:", error);
-      alert("Failed to drop course. Please try again.");
+      if (r === "admin") {
+        const [overview, courses] = await Promise.all([
+          reportsService.getAdminOverview(),
+          reportsService.getAdminCourses(1, 10),
+        ]);
+        setReports({ role: r, overview, courses });
+        const t = await reportsService.getAdminTrends(
+          trendParams.from,
+          trendParams.to,
+          trendParams.interval
+        );
+        setTrends(t);
+      } else {
+        const [overview, courses] = await Promise.all([
+          reportsService.getTeacherOverview(),
+          reportsService.getTeacherCourses(undefined, 1, 10),
+        ]);
+        setReports({ role: r, overview, courses });
+        const t = await reportsService.getTeacherTrends(
+          undefined,
+          trendParams.from,
+          trendParams.to,
+          trendParams.interval
+        );
+        setTrends(t);
+      }
+    } catch (e) {
+      console.error("Failed to load reports", e);
+    }
+  };
+
+  const reloadTrendsOnly = async () => {
+    if (!reports) return;
+    try {
+      if (reports.role === "admin") {
+        const t = await reportsService.getAdminTrends(
+          trendParams.from,
+          trendParams.to,
+          trendParams.interval
+        );
+        setTrends(t);
+      } else {
+        const t = await reportsService.getTeacherTrends(
+          undefined,
+          trendParams.from,
+          trendParams.to,
+          trendParams.interval
+        );
+        setTrends(t);
+      }
+    } catch (e) {
+      console.error("Failed to load trends", e);
     }
   };
 
   const getStatusBadge = (status: string) => {
-    const statusStyles = {
+    const statusStyles: Record<string, string> = {
       ACTIVE: "bg-green-100 text-green-800",
       COMPLETED: "bg-blue-100 text-blue-800",
       DROPPED: "bg-red-100 text-red-800",
       PENDING: "bg-yellow-100 text-yellow-800",
     };
-
+    const viText: Record<string, string> = {
+      ACTIVE: "Đang học",
+      COMPLETED: "Hoàn thành",
+      DROPPED: "Đã hủy",
+      PENDING: "Chờ duyệt",
+    };
+    const key = String(status).toUpperCase();
     return (
       <span
         className={`px-2 py-1 text-xs font-medium rounded-full ${
-          statusStyles[status as keyof typeof statusStyles]
+          statusStyles[key] || "bg-gray-100 text-gray-700"
         }`}
       >
-        {status}
+        {viText[key] || status}
       </span>
     );
   };
@@ -167,32 +248,27 @@ export default function StudentDashboard() {
     return "bg-green-500";
   };
 
-  // helper to coerce progress values to safe integer (0-100)
   const safeProgress = (p: any) => {
     const n = Number(p);
     if (!Number.isFinite(n) || isNaN(n)) return 0;
     return Math.round(Math.max(0, Math.min(100, n)));
   };
 
-  // Calculate stats (students only; default zeros otherwise)
   const stats = useMemo(() => {
-    if (user?.role !== "ROLE_STUDENT") {
+    if (role !== "ROLE_STUDENT")
       return {
         totalEnrolled: 0,
         activeEnrollments: 0,
         completedCourses: 0,
         averageProgress: 0,
       };
-    }
-    // normalize statuses to be robust against casing or unexpected values
     const normalized = enrollments.map((e) => ({
       ...e,
       _status: String(e.status || "").toUpperCase(),
       _progress: safeProgress((e as any).progress_percentage),
     }));
-
     const notDropped = normalized.filter((e) => e._status !== "DROPPED");
-    const totalEnrolled = notDropped.length; // exclude dropped
+    const totalEnrolled = notDropped.length;
     const activeEnrollments = normalized.filter(
       (e) => e._status === "ACTIVE"
     ).length;
@@ -211,23 +287,46 @@ export default function StudentDashboard() {
       completedCourses,
       averageProgress,
     };
-  }, [user?.role, enrollments]);
+  }, [role, enrollments]);
 
-  // paginated enrollments (client-side)
   const paginatedEnrollments = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return enrollments.slice(start, start + pageSize);
   }, [enrollments, currentPage, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(enrollments.length / pageSize));
-
   const goToPage = (p: number) => {
     const page = Math.max(1, Math.min(totalPages, p));
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
-  if (loading) {
+  const switchTab = (tabId: string) => {
+    setActiveTab(tabId);
+    router.push(`/dashboard?tab=${encodeURIComponent(tabId)}`, {
+      scroll: false,
+    });
+  };
+
+  const tabs = useMemo(() => {
+    const base = [{ id: "overview", label: "Tổng quan", icon: ChartBarIcon }];
+    const report =
+      role === "ROLE_ADMIN" || role === "ROLE_TEACHER"
+        ? [{ id: "reports", label: "Báo cáo", icon: ChartBarIcon }]
+        : [];
+    const student =
+      role === "ROLE_STUDENT"
+        ? [
+            { id: "courses", label: "Khóa học của tôi", icon: BookOpenIcon },
+            { id: "learning", label: "Lộ trình học", icon: AcademicCapIcon },
+          ]
+        : [];
+    return [...base, ...report, ...student];
+  }, [role]);
+
+  if (!isMounted || loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -243,35 +342,26 @@ export default function StudentDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Heading
-        title="Student Dashboard - ELearning Platform"
-        description="Track your learning progress and manage your enrollments"
-        keywords="student, dashboard, courses, progress, learning"
+        title="Bảng điều khiển - Nền tảng học trực tuyến"
+        description="Theo dõi tiến độ học và quản lý ghi danh"
+        keywords="học viên, bảng điều khiển, khóa học, tiến độ, học tập"
       />
       <Header />
 
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, {user?.firstName}!
+            Chào mừng trở lại, {user?.firstName}!
           </h1>
-          <p className="text-gray-600">Continue your learning journey</p>
+          <p className="text-gray-600">Tiếp tục hành trình học tập của bạn</p>
         </div>
 
-        {/* Navigation Tabs */}
         <div className="bg-white rounded-lg shadow-sm mb-8">
           <nav className="flex space-x-8 px-6">
-            {[
-              { id: "overview", label: "Overview", icon: ChartBarIcon },
-              // Only show student courses tab for ROLE_STUDENT
-              ...(user?.role === "ROLE_STUDENT"
-                ? ([
-                    { id: "courses", label: "My Courses", icon: BookOpenIcon },
-                  ] as const)
-                : ([] as const)),
-            ].map((tab) => (
+            {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => switchTab(tab.id)}
                 className={`flex items-center space-x-2 py-4 border-b-2 font-medium text-sm ${
                   activeTab === tab.id
                     ? "border-blue-500 text-blue-600"
@@ -285,11 +375,9 @@ export default function StudentDashboard() {
           </nav>
         </div>
 
-        {/* Overview Tab */}
         {activeTab === "overview" && (
           <div className="space-y-8">
-            {/* Role-specific overview */}
-            {user?.role === "ROLE_STUDENT" && (
+            {role === "ROLE_STUDENT" && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="flex items-center">
@@ -298,7 +386,7 @@ export default function StudentDashboard() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-500">
-                        Total Enrolled
+                        Tổng số ghi danh
                       </p>
                       <p className="text-2xl font-bold text-gray-900">
                         {stats.totalEnrolled}
@@ -313,7 +401,7 @@ export default function StudentDashboard() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-500">
-                        Active Courses
+                        Khóa học đang học
                       </p>
                       <p className="text-2xl font-bold text-gray-900">
                         {stats.activeEnrollments}
@@ -328,7 +416,7 @@ export default function StudentDashboard() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-500">
-                        Completed
+                        Hoàn thành
                       </p>
                       <p className="text-2xl font-bold text-gray-900">
                         {stats.completedCourses}
@@ -343,7 +431,7 @@ export default function StudentDashboard() {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-500">
-                        Avg Progress
+                        Tiến độ trung bình
                       </p>
                       <p className="text-2xl font-bold text-gray-900">
                         {stats.averageProgress}%
@@ -354,24 +442,23 @@ export default function StudentDashboard() {
               </div>
             )}
 
-            {user?.role === "ROLE_TEACHER" && (
+            {role === "ROLE_TEACHER" && (
               <div className="space-y-6">
-                {/* Teacher KPIs */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="bg-white rounded-lg shadow-sm p-6">
-                    <div className="text-sm text-gray-500">Courses Taught</div>
+                    <div className="text-sm text-gray-500">
+                      Khóa học giảng dạy
+                    </div>
                     <div className="text-3xl font-bold">{myCoursesCount}</div>
                   </div>
                   <div className="bg-white rounded-lg shadow-sm p-6">
-                    <div className="text-sm text-gray-500">Students</div>
+                    <div className="text-sm text-gray-500">Học viên</div>
                     <div className="text-3xl font-bold">
                       {teacherStats.totalStudents}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg shadow-sm p-6">
-                    <div className="text-sm text-gray-500">
-                      Pending Approvals
-                    </div>
+                    <div className="text-sm text-gray-500">Chờ phê duyệt</div>
                     <div className="text-3xl font-bold">
                       {teacherStats.pending}
                     </div>
@@ -380,30 +467,31 @@ export default function StudentDashboard() {
                     href="/instructor/courses"
                     className="bg-white rounded-lg shadow-sm p-6 hover:bg-gray-50"
                   >
-                    <div className="text-sm text-gray-500">Manage Courses</div>
-                    <div className="text-sm text-blue-600">Open</div>
+                    <div className="text-sm text-gray-500">
+                      Quản lý khóa học
+                    </div>
+                    <div className="text-sm text-blue-600">Mở</div>
                   </Link>
                 </div>
 
-                {/* Aggregated progress chart */}
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Student Progress Overview
+                    Tổng quan tiến độ học viên
                   </h3>
                   <div className="space-y-3">
                     {[
                       {
-                        label: "Active",
+                        label: "Đang học",
                         value: teacherStats.active,
                         color: "bg-blue-600",
                       },
                       {
-                        label: "Completed",
+                        label: "Hoàn thành",
                         value: teacherStats.completed,
                         color: "bg-green-600",
                       },
                       {
-                        label: "Dropped",
+                        label: "Đã hủy",
                         value: teacherStats.dropped,
                         color: "bg-gray-400",
                       },
@@ -438,19 +526,18 @@ export default function StudentDashboard() {
                   </div>
                 </div>
 
-                {/* Pending approvals */}
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">
-                      Enrollment Approvals
+                      Phê duyệt ghi danh
                     </h3>
                     <span className="text-sm text-gray-500">
-                      {pendingEnrollments.length} pending
+                      {pendingEnrollments.length} đang chờ
                     </span>
                   </div>
                   {pendingEnrollments.length === 0 ? (
                     <p className="text-sm text-gray-600">
-                      No pending enrollments right now.
+                      Hiện không có ghi danh đang chờ.
                     </p>
                   ) : (
                     <ul className="divide-y">
@@ -464,7 +551,7 @@ export default function StudentDashboard() {
                               {e.course_title}
                             </div>
                             <div className="text-xs text-gray-500">
-                              Student ID: {e.student_id}
+                              Mã học viên: {e.student_id}
                             </div>
                           </div>
                           <div className="flex gap-2">
@@ -487,7 +574,7 @@ export default function StudentDashboard() {
                               }}
                               className="px-3 py-1 text-sm rounded bg-green-600 text-white hover:bg-green-700"
                             >
-                              Approve
+                              Duyệt
                             </button>
                             <button
                               onClick={async () => {
@@ -508,7 +595,7 @@ export default function StudentDashboard() {
                               }}
                               className="px-3 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700"
                             >
-                              Decline
+                              Từ chối
                             </button>
                           </div>
                         </li>
@@ -519,33 +606,42 @@ export default function StudentDashboard() {
               </div>
             )}
 
-            {/* Quick Actions */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Quick Actions
+                Tác vụ nhanh
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Link
-                  href="/courses"
-                  className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <BookOpenIcon className="w-5 h-5" />
-                  <span>Browse Courses</span>
-                </Link>
+                {role === "ROLE_STUDENT" ? (
+                  <Link
+                    href="/submissions"
+                    className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <BookOpenIcon className="w-5 h-5" />
+                    <span>Bài nộp của tôi</span>
+                  </Link>
+                ) : (
+                  <Link
+                    href="/courses"
+                    className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <BookOpenIcon className="w-5 h-5" />
+                    <span>Xem khóa học</span>
+                  </Link>
+                )}
 
-                {user?.role === "ROLE_STUDENT" && (
+                {role === "ROLE_STUDENT" && (
                   <button
-                    onClick={() => setActiveTab("courses")}
+                    onClick={() => switchTab("courses")}
                     className="flex items-center justify-center space-x-2 bg-gray-600 text-white px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors"
                   >
                     <AcademicCapIcon className="w-5 h-5" />
-                    <span>My Courses</span>
+                    <span>Khóa học của tôi</span>
                   </button>
                 )}
 
                 <Link
                   href={
-                    user?.role === "ROLE_TEACHER"
+                    role === "ROLE_TEACHER"
                       ? "/instructor/courses"
                       : "/progress"
                   }
@@ -553,19 +649,18 @@ export default function StudentDashboard() {
                 >
                   <ChartBarIcon className="w-5 h-5" />
                   <span>
-                    {user?.role === "ROLE_TEACHER"
-                      ? "Manage Courses"
-                      : "View Progress"}
+                    {role === "ROLE_TEACHER"
+                      ? "Quản lý khóa học"
+                      : "Xem tiến độ"}
                   </span>
                 </Link>
               </div>
             </div>
 
-            {/* Recent Activity (students only) */}
-            {user?.role === "ROLE_STUDENT" && enrollments.length > 0 && (
+            {role === "ROLE_STUDENT" && enrollments.length > 0 && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Recent Activity
+                  Hoạt động gần đây
                 </h2>
                 <div className="space-y-4">
                   {enrollments.slice(0, 3).map((enrollment) => (
@@ -578,7 +673,7 @@ export default function StudentDashboard() {
                           {enrollment.course?.title}
                         </h3>
                         <p className="text-sm text-gray-600">
-                          Enrolled on{" "}
+                          Ghi danh ngày {""}
                           {new Date(
                             enrollment.enrolled_at
                           ).toLocaleDateString()}
@@ -612,18 +707,404 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* Courses Tab (students only) */}
-        {user?.role === "ROLE_STUDENT" && activeTab === "courses" && (
+        {activeTab === "reports" &&
+          (role === "ROLE_ADMIN" || role === "ROLE_TEACHER") && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <div className="mb-5">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {role === "ROLE_ADMIN"
+                      ? "Báo cáo quản trị"
+                      : "Báo cáo giảng viên"}
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Theo dõi hiệu suất và xu hướng học tập theo thời gian
+                  </p>
+                </div>
+                <div className="mb-6 bg-gray-50/80 border border-gray-200 rounded-lg p-4 flex flex-wrap items-end gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Từ ngày
+                    </label>
+                    <input
+                      type="date"
+                      value={trendParams.from}
+                      onChange={(e) =>
+                        setTrendParams((p) => ({ ...p, from: e.target.value }))
+                      }
+                      className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Đến ngày
+                    </label>
+                    <input
+                      type="date"
+                      value={trendParams.to}
+                      onChange={(e) =>
+                        setTrendParams((p) => ({ ...p, to: e.target.value }))
+                      }
+                      className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Khoảng thời gian
+                    </label>
+                    <select
+                      value={trendParams.interval}
+                      onChange={(e) =>
+                        setTrendParams((p) => ({
+                          ...p,
+                          interval: e.target.value as "day" | "month",
+                        }))
+                      }
+                      className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="day">Ngày</option>
+                      <option value="month">Tháng</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={reloadTrendsOnly}
+                    className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 shadow-sm"
+                  >
+                    Áp dụng
+                  </button>
+                </div>
+
+                {!reports ? (
+                  <div className="text-sm text-gray-600">
+                    Đang tải báo cáo...
+                  </div>
+                ) : reports.role === "admin" ? (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <div className="rounded-xl border bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                            <AcademicCapIcon className="h-6 w-6" />
+                          </span>
+                          <div>
+                            <div className="text-xs uppercase tracking-wide text-gray-500">
+                              Người dùng
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {reports.overview?.totals?.users ?? 0}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
+                            <BookOpenIcon className="h-6 w-6" />
+                          </span>
+                          <div>
+                            <div className="text-xs uppercase tracking-wide text-gray-500">
+                              Khóa học
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {reports.overview?.totals?.courses ?? 0}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                            <ChartBarIcon className="h-6 w-6" />
+                          </span>
+                          <div>
+                            <div className="text-xs uppercase tracking-wide text-gray-500">
+                              Lượt ghi danh
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {reports.overview?.totals?.enrollments ?? 0}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                            <CheckCircleIcon className="h-6 w-6" />
+                          </span>
+                          <div>
+                            <div className="text-xs uppercase tracking-wide text-gray-500">
+                              Bài nộp
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {reports.overview?.totals?.submissions ?? 0}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border bg-white p-5 shadow-sm">
+                      <h3 className="font-semibold text-gray-900 mb-4">
+                        Hiệu quả khóa học (Top 10)
+                      </h3>
+                      <div className="divide-y">
+                        {((reports.courses?.data || []) as any[]).map(
+                          (row: any, _, arr: any[]) => {
+                            const maxEnroll = Math.max(
+                              1,
+                              ...arr.map((r: any) => Number(r.enrollments || 0))
+                            );
+                            const val = Number(row.enrollments || 0);
+                            const width = Math.round((val / maxEnroll) * 100);
+                            return (
+                              <div key={row.id} className="py-3">
+                                <div className="flex items-center justify-between gap-4 text-sm">
+                                  <div className="flex-1 truncate pr-3 text-gray-900 font-medium">
+                                    {row.title}
+                                  </div>
+                                  <div className="w-28 text-right text-gray-700">
+                                    Ghi danh: {val}
+                                  </div>
+                                  <div className="w-36 text-right text-gray-700">
+                                    Đánh giá TB:{" "}
+                                    {Number(row.avg_rating || 0).toFixed(2)}
+                                  </div>
+                                </div>
+                                <div className="mt-2 h-2 w-full rounded-full bg-gray-200">
+                                  <div
+                                    className="h-2 rounded-full bg-gradient-to-r from-blue-400 to-blue-600"
+                                    style={{ width: `${width}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          }
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border bg-white p-5 shadow-sm">
+                      <h3 className="font-semibold text-gray-900 mb-4">
+                        Xu hướng
+                      </h3>
+                      {!trends ? (
+                        <div className="text-sm text-gray-600">
+                          Đang tải xu hướng...
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                          {(
+                            ["enrollments", "submissions", "reviews"] as const
+                          ).map((key) => {
+                            const labels: Record<string, string> = {
+                              enrollments: "Ghi danh",
+                              submissions: "Bài nộp",
+                              reviews: "Đánh giá",
+                            };
+                            const series = (trends as any)[key] || [];
+                            const max = Math.max(
+                              1,
+                              ...series.map((s: any) => Number(s.count || 0))
+                            );
+                            return (
+                              <div
+                                key={key}
+                                className="rounded-lg bg-gray-50 p-4"
+                              >
+                                <div className="text-sm font-medium text-gray-800 mb-2">
+                                  {labels[key]}
+                                </div>
+                                <div className="flex items-end gap-1.5 h-28">
+                                  {series.map((s: any) => {
+                                    const h =
+                                      (Number(s.count || 0) / max) * 100;
+                                    return (
+                                      <div
+                                        key={s.bucket}
+                                        title={`${s.bucket}: ${s.count}`}
+                                        className="w-2.5 rounded-t-md bg-gradient-to-t from-blue-300 to-blue-600"
+                                        style={{ height: `${h}%` }}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                                <div className="mt-1 text-[10px] text-gray-500 truncate">
+                                  {series.map((s: any) => s.bucket).join("  ")}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="rounded-xl border bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
+                            <BookOpenIcon className="h-6 w-6" />
+                          </span>
+                          <div>
+                            <div className="text-xs uppercase tracking-wide text-gray-500">
+                              Khóa học
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {reports.overview?.totals?.courses ?? 0}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                            <AcademicCapIcon className="h-6 w-6" />
+                          </span>
+                          <div>
+                            <div className="text-xs uppercase tracking-wide text-gray-500">
+                              Học viên
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {reports.overview?.totals?.students ?? 0}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                            <ChartBarIcon className="h-6 w-6" />
+                          </span>
+                          <div>
+                            <div className="text-xs uppercase tracking-wide text-gray-500">
+                              Ghi danh đang hoạt động
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {reports.overview?.enrollments?.active ?? 0}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border bg-white p-5 shadow-sm">
+                      <h3 className="font-semibold text-gray-900 mb-4">
+                        Khóa học của bạn (Top 10)
+                      </h3>
+                      <div className="divide-y">
+                        {((reports.courses?.data || []) as any[]).map(
+                          (row: any, _, arr: any[]) => {
+                            const maxEnroll = Math.max(
+                              1,
+                              ...arr.map((r: any) => Number(r.enrollments || 0))
+                            );
+                            const val = Number(row.enrollments || 0);
+                            const width = Math.round((val / maxEnroll) * 100);
+                            return (
+                              <div key={row.id} className="py-3">
+                                <div className="flex items-center justify-between gap-4 text-sm">
+                                  <div className="flex-1 truncate pr-3 text-gray-900 font-medium">
+                                    {row.title}
+                                  </div>
+                                  <div className="w-28 text-right text-gray-700">
+                                    Ghi danh: {val}
+                                  </div>
+                                  <div className="w-36 text-right text-gray-700">
+                                    Đánh giá TB:{" "}
+                                    {Number(row.avg_rating || 0).toFixed(2)}
+                                  </div>
+                                </div>
+                                <div className="mt-2 h-2 w-full rounded-full bg-gray-200">
+                                  <div
+                                    className="h-2 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600"
+                                    style={{ width: `${width}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          }
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border bg-white p-5 shadow-sm">
+                      <h3 className="font-semibold text-gray-900 mb-4">
+                        Xu hướng
+                      </h3>
+                      {!trends ? (
+                        <div className="text-sm text-gray-600">
+                          Đang tải xu hướng...
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                          {(
+                            ["enrollments", "submissions", "reviews"] as const
+                          ).map((key) => {
+                            const labels: Record<string, string> = {
+                              enrollments: "Ghi danh",
+                              submissions: "Bài nộp",
+                              reviews: "Đánh giá",
+                            };
+                            const series = (trends as any)[key] || [];
+                            const max = Math.max(
+                              1,
+                              ...series.map((s: any) => Number(s.count || 0))
+                            );
+                            return (
+                              <div
+                                key={key}
+                                className="rounded-lg bg-gray-50 p-4"
+                              >
+                                <div className="text-sm font-medium text-gray-800 mb-2">
+                                  {labels[key]}
+                                </div>
+                                <div className="flex items-end gap-1.5 h-28">
+                                  {series.map((s: any) => {
+                                    const h =
+                                      (Number(s.count || 0) / max) * 100;
+                                    return (
+                                      <div
+                                        key={s.bucket}
+                                        title={`${s.bucket}: ${s.count}`}
+                                        className="w-2.5 rounded-t-md bg-gradient-to-t from-emerald-300 to-emerald-600"
+                                        style={{ height: `${h}%` }}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                                <div className="mt-1 text-[10px] text-gray-500 truncate">
+                                  {series.map((s: any) => s.bucket).join("  ")}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+        {activeTab === "learning" && role === "ROLE_STUDENT" && (
+          <div className="space-y-6">
+            <LearningPathSplit />
+          </div>
+        )}
+
+        {role === "ROLE_STUDENT" && activeTab === "courses" && (
           <div>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
-                My Enrolled Courses
+                Khóa học đã ghi danh
               </h2>
               <Link
                 href="/courses"
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Browse More Courses
+                Xem thêm khóa học
               </Link>
             </div>
 
@@ -631,32 +1112,32 @@ export default function StudentDashboard() {
               <div className="bg-white rounded-lg shadow-sm p-12 text-center">
                 <BookOpenIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  No Enrolled Courses
+                  Chưa có khóa học đã ghi danh
                 </h3>
                 <p className="text-gray-600 mb-6">
-                  Start your learning journey by enrolling in a course.
+                  Bắt đầu hành trình học tập bằng cách ghi danh một khóa học.
                 </p>
                 <Link
                   href="/courses"
                   className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  Browse Courses
+                  Xem khóa học
                 </Link>
               </div>
             ) : (
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div className="text-sm text-gray-600">
-                    Showing{" "}
+                    Hiển thị{" "}
                     {Math.min(
                       (currentPage - 1) * pageSize + 1,
                       enrollments.length
                     )}{" "}
-                    - {Math.min(currentPage * pageSize, enrollments.length)} of{" "}
-                    {enrollments.length}
+                    - {Math.min(currentPage * pageSize, enrollments.length)}{" "}
+                    trong tổng {enrollments.length}
                   </div>
                   <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-600">Per page:</label>
+                    <label className="text-sm text-gray-600">Mỗi trang:</label>
                     <select
                       value={pageSize}
                       onChange={(e) => {
@@ -681,6 +1162,7 @@ export default function StudentDashboard() {
                       className="bg-white rounded-lg shadow-md overflow-hidden"
                     >
                       {enrollment.course?.thumbnail_url && (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={enrollment.course.thumbnail_url}
                           alt={enrollment.course.title}
@@ -702,7 +1184,7 @@ export default function StudentDashboard() {
 
                         <div className="mb-4">
                           <div className="flex justify-between items-center text-sm text-gray-600 mb-1">
-                            <span>Progress</span>
+                            <span>Tiến độ</span>
                             <span>
                               {safeProgress(enrollment.progress_percentage)}%
                             </span>
@@ -723,14 +1205,14 @@ export default function StudentDashboard() {
 
                         <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
                           <span>
-                            Enrolled:{" "}
+                            Ghi danh:{" "}
                             {new Date(
                               enrollment.enrolled_at
                             ).toLocaleDateString()}
                           </span>
                           {enrollment.completed_at && (
                             <span>
-                              Completed:{" "}
+                              Hoàn thành:{" "}
                               {new Date(
                                 enrollment.completed_at
                               ).toLocaleDateString()}
@@ -743,7 +1225,7 @@ export default function StudentDashboard() {
                             href={`/learn/${enrollment.course_id}`}
                             className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-center text-sm"
                           >
-                            Continue Learning
+                            Tiếp tục học
                           </Link>
                         </div>
                       </div>
@@ -751,7 +1233,6 @@ export default function StudentDashboard() {
                   ))}
                 </div>
 
-                {/* Pagination controls */}
                 <div className="flex items-center justify-center mt-6 space-x-2">
                   <button
                     onClick={() => goToPage(currentPage - 1)}
@@ -762,7 +1243,7 @@ export default function StudentDashboard() {
                         : "bg-white border"
                     }`}
                   >
-                    Previous
+                    Trước
                   </button>
 
                   {Array.from({ length: totalPages }).map((_, i) => {
@@ -791,7 +1272,7 @@ export default function StudentDashboard() {
                         : "bg-white border"
                     }`}
                   >
-                    Next
+                    Sau
                   </button>
                 </div>
               </div>

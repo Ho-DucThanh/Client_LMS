@@ -25,7 +25,7 @@ const LessonList: React.FC<LessonListProps> = ({
 }) => (
   <>
     {lessons.length === 0 ? (
-      <div className="text-gray-600">No lessons</div>
+      <div className="text-gray-600">Chưa có bài học</div>
     ) : (
       <ul className="space-y-4">
         {lessons.map((l: any, i: number) => (
@@ -49,7 +49,7 @@ const LessonList: React.FC<LessonListProps> = ({
                       </span>
                       {completedByLesson[l.id] && (
                         <span className="text-green-700 text-xs">
-                          • students completed
+                          • học viên đã hoàn thành
                         </span>
                       )}
                     </div>
@@ -57,30 +57,48 @@ const LessonList: React.FC<LessonListProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 mr-2">
+                  <button
+                    onClick={() => moveLesson(l.id, "up")}
+                    disabled={i === 0}
+                    className="px-2 py-1 text-xs rounded-md border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Di chuyển lên"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => moveLesson(l.id, "down")}
+                    disabled={i === lessons.length - 1}
+                    className="px-2 py-1 text-xs rounded-md border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Di chuyển xuống"
+                  >
+                    ↓
+                  </button>
+                </div>
                 <button
                   onClick={() => onAddAssignment(l.id)}
                   className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm"
                 >
-                  Add Assignment
+                  Thêm bài tập
                 </button>
                 <button
                   onClick={() => editLesson(l)}
                   className="px-3 py-1 text-sm rounded-md border bg-white hover:bg-gray-50"
                 >
-                  Edit
+                  Chỉnh sửa
                 </button>
                 <button
                   onClick={() => deleteLesson(l.id)}
                   className="px-3 py-1 text-sm rounded-md border text-red-600 bg-white hover:bg-gray-50"
                 >
-                  Delete
+                  Xóa
                 </button>
               </div>
             </div>
 
             <div className="mt-4">
               {(assignmentsByLesson[l.id] || []).length === 0 ? (
-                <div className="text-sm text-gray-500">No assignments</div>
+                <div className="text-sm text-gray-500">Chưa có bài tập</div>
               ) : (
                 <ul className="space-y-2">
                   {(assignmentsByLesson[l.id] || []).map((a: any) => (
@@ -93,7 +111,7 @@ const LessonList: React.FC<LessonListProps> = ({
                           {a.title}
                         </div>
                         <div className="text-gray-500">
-                          Max: {a.max_score} • Due:{" "}
+                          Tối đa: {a.max_score} • Hạn: {""}
                           {new Date(a.due_date).toLocaleDateString()}
                         </div>
                       </div>
@@ -104,7 +122,7 @@ const LessonList: React.FC<LessonListProps> = ({
                           }
                           className="px-3 py-1 text-sm rounded-md border bg-white hover:bg-gray-50"
                         >
-                          Edit
+                          Chỉnh sửa
                         </button>
                         <button
                           onClick={() =>
@@ -112,7 +130,7 @@ const LessonList: React.FC<LessonListProps> = ({
                           }
                           className="px-3 py-1 text-sm rounded-md border text-red-600 bg-white hover:bg-gray-50"
                         >
-                          Delete
+                          Xóa
                         </button>
                       </div>
                     </li>

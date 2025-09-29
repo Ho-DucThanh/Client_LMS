@@ -33,56 +33,54 @@ class ApiService {
       ...options,
     };
 
-    try {
-      const response = await fetch(url, config);
+    const response = await fetch(url, config);
 
-      const contentType = response.headers.get("content-type") || "";
+    const contentType = response.headers.get("content-type") || "";
 
-      // Handle non-OK responses: best-effort parse body for message
-      if (!response.ok) {
-        let parsedMessage: string | undefined;
+    // Handle non-OK responses: best-effort parse body for message
+    if (!response.ok) {
+      let parsed: any = undefined;
+      const raw = await response.text().catch(() => undefined);
+      if (raw) {
         try {
-          const errorText = await response.text();
-          if (errorText) {
-            if (contentType.includes("application/json")) {
-              const errJson = JSON.parse(errorText);
-              parsedMessage = errJson?.message || errJson?.error || undefined;
-            } else {
-              parsedMessage = errorText;
-            }
-          }
-        } catch {}
-        throw new Error(
-          parsedMessage || `HTTP error! status: ${response.status}`
-        );
-      }
-
-      // Short-circuit for No Content
-      if (response.status === 204) {
-        return null;
-      }
-
-      // Some endpoints may return empty body with 200; parse safely
-      const text = await response.text();
-      if (!text) {
-        return null;
-      }
-
-      if (contentType.includes("application/json")) {
-        try {
-          return JSON.parse(text);
-        } catch (e) {
-          console.warn("API JSON parse warning:", e);
-          return null;
+          parsed = contentType.includes("application/json")
+            ? JSON.parse(raw)
+            : raw;
+        } catch {
+          parsed = raw;
         }
       }
-
-      // Fallback: return raw text for non-JSON responses
-      return text;
-    } catch (error) {
-      console.debug("API request failed:", error);
-      throw error;
+      const err: any = new Error(
+        (parsed && (parsed.message || parsed.error)) ||
+          `HTTP ${response.status}`
+      );
+      err.status = response.status;
+      err.response = parsed;
+      throw err;
     }
+
+    // Short-circuit for No Content
+    if (response.status === 204) {
+      return null;
+    }
+
+    // Some endpoints may return empty body with 200; parse safely
+    const text = await response.text();
+    if (!text) {
+      return null;
+    }
+
+    if (contentType.includes("application/json")) {
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.warn("API JSON parse warning:", e);
+        return null;
+      }
+    }
+
+    // Fallback: return raw text for non-JSON responses
+    return text;
   }
 
   async get(endpoint: string) {

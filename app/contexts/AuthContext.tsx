@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       return false;
     } catch (error) {
-      console.error("Login error:", error);
+      // Swallow expected auth errors to avoid dev overlay noise
       return false;
     } finally {
       setLoading(false);
@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       return false;
     } catch (error) {
-      console.error("Registration error:", error);
+      // Avoid noisy console errors in dev for expected validation failures
       return false;
     } finally {
       setLoading(false);

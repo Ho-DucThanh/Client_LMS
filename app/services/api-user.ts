@@ -18,6 +18,9 @@ export const userService = {
   },
 
   async forgotPassword(email: string) {
-    return baseApi.post("/users/forgot-password", { email });
+    return baseApi.post("/auth/forgot-password", { email });
+  },
+  async resetPassword(token: string, newPassword: string) {
+    return baseApi.post("/auth/reset-password", { token, newPassword });
   },
 };

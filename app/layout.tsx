@@ -18,6 +18,9 @@ export const metadata: Metadata = {
   title: "EduPlatform - Online Learning Made Easy",
   description:
     "A comprehensive e-learning platform for students, instructors, and administrators",
+  other: {
+    google: "notranslate",
+  },
 };
 
 export default function RootLayout({
@@ -26,9 +29,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="vi" className="notranslate" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         <AuthProvider>
           {children}

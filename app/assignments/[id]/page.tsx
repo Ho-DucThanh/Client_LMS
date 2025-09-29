@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
 import {
   DocumentTextIcon,
@@ -26,6 +27,7 @@ interface Assignment {
   courseId: number;
   allowedFileTypes: string[];
   maxFileSize: number;
+  overdue?: boolean;
 }
 
 interface Submission {
@@ -70,13 +72,61 @@ const AssignmentSubmissionPage = () => {
     try {
       setLoading(true);
       const assignmentData = await apiService.get(`/assignments/${params.id}`);
-      setAssignment(assignmentData);
+      // Normalize API response (snake_case) to the UI shape expected here
+      const normalized: Assignment = {
+        id: assignmentData.id,
+        title: assignmentData.title,
+        description: assignmentData.description ?? "",
+        instructions:
+          assignmentData.content?.instructions ??
+          assignmentData.description ??
+          "",
+        dueDate:
+          assignmentData.dueDate ??
+          assignmentData.due_date ??
+          assignmentData.due_at ??
+          "",
+        maxPoints: Number(
+          assignmentData.maxPoints ?? assignmentData.max_points ?? 100
+        ),
+        courseTitle:
+          assignmentData.lesson?.module?.course?.title ??
+          assignmentData.lesson?.title ??
+          "",
+        courseId:
+          assignmentData.lesson?.module?.course?.id ??
+          assignmentData.lesson?.module?.course_id ??
+          assignmentData.lesson?.course_id ??
+          0,
+        allowedFileTypes:
+          assignmentData.content?.allowedFileTypes ??
+          assignmentData.content?.allowed_types ??
+          [],
+        maxFileSize:
+          assignmentData.content?.maxFileSize ??
+          assignmentData.content?.max_file_size ??
+          25,
+        overdue: Boolean(
+          assignmentData.overdue ??
+            ((): boolean => {
+              const d =
+                assignmentData.dueDate ??
+                assignmentData.due_date ??
+                assignmentData.due_at;
+              const ms = d ? Date.parse(d) : NaN;
+              return Number.isFinite(ms) && Date.now() > ms;
+            })()
+        ),
+      };
+      setAssignment(normalized);
 
       if (isAuthenticated) {
         try {
           const submissions = await apiService.getMySubmissions();
           const currentSubmission = submissions.find(
-            (s: any) => s.assignmentId === Number(params.id)
+            (s: any) =>
+              s.assignmentId === Number(params.id) ||
+              s.assignment_id === Number(params.id)
           );
           setSubmission(currentSubmission || null);
 
@@ -135,6 +185,11 @@ const AssignmentSubmissionPage = () => {
       return;
     }
 
+    if (assignment && isOverdue(assignment.dueDate)) {
+      toast.error("Bài tập đã quá hạn, không thể nộp.");
+      return;
+    }
+
     try {
       setSubmitting(true);
 
@@ -175,17 +230,37 @@ const AssignmentSubmissionPage = () => {
         file_url: uploadedFiles[0]?.url,
       } as any;
 
-      await apiService.submitAssignment(Number(params.id), submissionData);
+      const resp = await apiService.submitAssignment(
+        Number(params.id),
+        submissionData
+      );
+      if (resp && resp.success === false && resp.canSubmit === false) {
+        // graceful non-error response from server for non-submittable cases
+        toast.error(resp.message || "Bài tập đã quá hạn, không thể nộp.");
+        return;
+      }
       loadAssignmentData(); // Refresh data
-    } catch (error) {
-      console.error("Error submitting assignment:", error);
+    } catch (error: any) {
+      const status = error?.status;
+      const serverMsg = error?.response?.message || error?.message;
+      if (status === 422 || /quá hạn|deadline|overdue/i.test(serverMsg || "")) {
+        // Expected case: just inform user, no console noise
+        toast.error("Bài tập đã quá hạn, không thể nộp.");
+      } else {
+        console.error("Error submitting assignment:", error);
+        toast.error(serverMsg || "Submit thất bại");
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
   const isOverdue = (dueDate: string) => {
-    return new Date() > new Date(dueDate);
+    if (assignment?.overdue) return true;
+    if (!dueDate) return false;
+    const dueMs = Date.parse(dueDate);
+    if (Number.isNaN(dueMs)) return false;
+    return Date.now() > dueMs;
   };
 
   const getTimeRemaining = (dueDate: string) => {
@@ -416,6 +491,7 @@ const AssignmentSubmissionPage = () => {
                         type="submit"
                         disabled={
                           submitting ||
+                          isOverdue(assignment.dueDate) ||
                           (!formData.content.trim() &&
                             formData.files.length === 0)
                         }

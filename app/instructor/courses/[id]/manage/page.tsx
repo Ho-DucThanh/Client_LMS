@@ -342,15 +342,40 @@ export default function ManageCoursePage() {
     if (idx === -1) return;
     const targetIdx = direction === "up" ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= modules.length) return;
-    const a = modules[idx];
-    const b = modules[targetIdx];
-    const aIdx = (a.order_index ?? idx + 1) as number;
-    const bIdx = (b.order_index ?? targetIdx + 1) as number;
-    await Promise.all([
-      moduleService.updateModule(a.id, { order_index: bIdx }),
-      moduleService.updateModule(b.id, { order_index: aIdx }),
-    ]);
-    await loadModules();
+    // Build a normalized ordering for all modules, then swap idx <-> targetIdx
+    const normalized = modules
+      .map((m, i) => ({
+        ...m,
+        _current: Number(m.order_index) > 0 ? Number(m.order_index) : i + 1,
+      }))
+      .sort((x, y) =>
+        x._current === y._current ? x.id - y.id : x._current - y._current
+      );
+    // swap positions
+    const temp = normalized[idx];
+    normalized[idx] = normalized[targetIdx];
+    normalized[targetIdx] = temp;
+    // assign new sequential order_index starting at 1
+    const updates = normalized.map((m, i) => ({
+      id: m.id,
+      order_index: i + 1,
+    }));
+    try {
+      await Promise.all(
+        updates
+          .filter(
+            (u) =>
+              modules.find((m) => m.id === u.id)?.order_index !== u.order_index
+          )
+          .map((u) =>
+            moduleService.updateModule(u.id, { order_index: u.order_index })
+          )
+      );
+      await loadModules();
+    } catch (e) {
+      console.error("Failed to reorder modules", e);
+      toast.error("Không thể thay đổi thứ tự modules");
+    }
   };
 
   // Edit/Delete/Move for lessons
@@ -392,15 +417,38 @@ export default function ManageCoursePage() {
     if (idx === -1) return;
     const targetIdx = direction === "up" ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= lessons.length) return;
-    const a = lessons[idx];
-    const b = lessons[targetIdx];
-    const aIdx = (a.order_index ?? idx + 1) as number;
-    const bIdx = (b.order_index ?? targetIdx + 1) as number;
-    await Promise.all([
-      lessonService.updateLesson(a.id, { order_index: bIdx }),
-      lessonService.updateLesson(b.id, { order_index: aIdx }),
-    ]);
-    if (selectedModuleId) await loadLessons(selectedModuleId);
+    // Normalize and swap within the lessons list
+    const normalized = lessons
+      .map((l, i) => ({
+        ...l,
+        _current: Number(l.order_index) > 0 ? Number(l.order_index) : i + 1,
+      }))
+      .sort((x, y) =>
+        x._current === y._current ? x.id - y.id : x._current - y._current
+      );
+    const temp = normalized[idx];
+    normalized[idx] = normalized[targetIdx];
+    normalized[targetIdx] = temp;
+    const updates = normalized.map((l, i) => ({
+      id: l.id,
+      order_index: i + 1,
+    }));
+    try {
+      await Promise.all(
+        updates
+          .filter(
+            (u) =>
+              lessons.find((l) => l.id === u.id)?.order_index !== u.order_index
+          )
+          .map((u) =>
+            lessonService.updateLesson(u.id, { order_index: u.order_index })
+          )
+      );
+      if (selectedModuleId) await loadLessons(selectedModuleId);
+    } catch (e) {
+      console.error("Failed to reorder lessons", e);
+      toast.error("Không thể thay đổi thứ tự lessons");
+    }
   };
 
   const createAssignment = async (lessonId: number) => {
@@ -675,9 +723,9 @@ export default function ManageCoursePage() {
     <RoleGuard roles={["ROLE_TEACHER", "ROLE_ADMIN"]}>
       <div className="min-h-screen bg-gray-50">
         <Heading
-          title="Manage Course"
-          description="Modules, lessons, assignments"
-          keywords="course,manage"
+          title="Quản lý khóa học"
+          description="Mô-đun, bài học, bài tập"
+          keywords="khoa hoc,quan ly"
         />
         <Header />
         <div className="container mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -696,7 +744,7 @@ export default function ManageCoursePage() {
           />
           <div className="bg-white rounded-md shadow-md p-6 lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">Lessons</h2>
+              <h2 className="text-xl font-semibold text-gray-800">Bài học</h2>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
@@ -715,7 +763,7 @@ export default function ManageCoursePage() {
                   }}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md shadow-sm"
                 >
-                  {showLessonForm ? "Close" : "Add"}
+                  {showLessonForm ? "Đóng" : "Thêm"}
                 </button>
               </div>
             </div>

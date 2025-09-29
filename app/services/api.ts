@@ -25,23 +25,25 @@ class ApiService {
       ...options,
     };
 
+    const response = await fetch(url, config);
+    const text = await response.text();
+    let data: any = undefined;
     try {
-      const response = await fetch(url, config);
-
-      if (!response.ok) {
-        const error = await response
-          .json()
-          .catch(() => ({ message: "Request failed" }));
-        throw new Error(
-          error.message || `HTTP error! status: ${response.status}`
-        );
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("API request failed:", error);
-      throw error;
+      data = text ? JSON.parse(text) : undefined;
+    } catch (e) {
+      data = text;
     }
+
+    if (!response.ok) {
+      const err: any = new Error(
+        (data && (data.message || data.error)) ||
+          `HTTP ${response.status}: ${response.statusText}`
+      );
+      (err.status = response.status), (err.response = data);
+      throw err;
+    }
+
+    return data;
   }
 
   async get(endpoint: string) {
@@ -134,6 +136,41 @@ class ApiService {
     return this.get("/enrollments/my-enrollments");
   }
 
+  // AI Recommendation
+  async generateRecommendation(data: {
+    goal: string;
+    currentLevel: string;
+    preferences: string[];
+    verbosity?: "short" | "medium" | "deep";
+    guidanceMode?: "novice" | "guided" | "standard";
+  }) {
+    return this.post("/recommendations", data);
+  }
+
+  async saveRecommendation(id: number, saved = true) {
+    return this.post(`/recommendations/${id}/save`, { saved });
+  }
+
+  async followUpRecommendation(id: number, question: string) {
+    return this.post(`/recommendations/${id}/followup`, { question });
+  }
+
+  async clarifyRecommendation(data: { question: string; context?: any }) {
+    return this.post(`/recommendations/clarify`, data);
+  }
+
+  // Learning Paths
+  async saveLearningPath(
+    recommendationId: number,
+    data: { name?: string; selectedCourseIds?: number[] }
+  ) {
+    return this.post(`/recommendations/${recommendationId}/save-path`, data);
+  }
+
+  async listMyLearningPaths() {
+    return this.post(`/recommendations/my-paths`, {});
+  }
+
   async getEnrollmentProgress(enrollmentId: number) {
     return this.get(`/enrollments/${enrollmentId}/progress`);
   }
@@ -219,12 +256,45 @@ class ApiService {
     return this.delete(`/admin/users/${userId}`);
   }
 
+  async blockUser(userId: number) {
+    return this.patch(`/admin/users/${userId}/block`, {});
+  }
+
+  async unblockUser(userId: number) {
+    return this.patch(`/admin/users/${userId}/unblock`, {});
+  }
+
   async assignRole(userId: number, roleData: any) {
     const roleName = typeof roleData === "string" ? roleData : roleData?.role;
     return this.post(
       `/admin/users/${userId}/roles/${encodeURIComponent(roleName)}`,
       {}
     );
+  }
+
+  // Admin category/tag management
+  async getAdminCategories() {
+    return this.get("/admin/categories");
+  }
+
+  async createAdminCategory(data: { name: string; description?: string }) {
+    return this.post("/admin/categories", data);
+  }
+
+  async deleteAdminCategory(id: number) {
+    return this.delete(`/admin/categories/${id}`);
+  }
+
+  async getAdminTags() {
+    return this.get("/admin/tags");
+  }
+
+  async createAdminTag(data: { name: string }) {
+    return this.post("/admin/tags", data);
+  }
+
+  async deleteAdminTag(id: number) {
+    return this.delete(`/admin/tags/${id}`);
   }
 
   async getSystemStats() {

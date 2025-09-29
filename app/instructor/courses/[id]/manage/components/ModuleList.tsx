@@ -30,17 +30,15 @@ const ModuleList: React.FC<ModuleListProps> = ({
   <div className="bg-white rounded-lg shadow-sm p-5">
     <div className="flex items-center justify-between mb-4">
       <div>
-        <h2 className="text-lg font-semibold text-gray-800">Modules</h2>
-        <p className="text-sm text-gray-500">
-          Organize your course with modules
-        </p>
+        <h2 className="text-lg font-semibold text-gray-800">Mô-đun</h2>
+        <p className="text-sm text-gray-500">Sắp xếp khóa học theo mô-đun</p>
       </div>
       <div>
         <button
           onClick={() => setShowModuleForm(!showModuleForm)}
           className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md shadow-sm text-sm"
         >
-          {showModuleForm ? "Close" : "+ Add module"}
+          {showModuleForm ? "Đóng" : "+ Thêm mô-đun"}
         </button>
       </div>
     </div>
@@ -51,14 +49,14 @@ const ModuleList: React.FC<ModuleListProps> = ({
           <input
             value={moduleTitle}
             onChange={(e) => setModuleTitle(e.target.value)}
-            placeholder="Module title"
+            placeholder="Tiêu đề mô-đun"
             className="flex-1 border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-100"
           />
           <button
             onClick={createModule}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md shadow-sm"
           >
-            Save
+            Lưu
           </button>
         </div>
       </div>
@@ -77,25 +75,42 @@ const ModuleList: React.FC<ModuleListProps> = ({
                 : ""
             }`}
             onClick={() => setSelectedModuleId(m.id)}
-            title={`Order: ${m.order_index ?? i + 1}`}
+            title={`Thứ tự: ${m.order_index ?? i + 1}`}
           >
             <div className="font-medium text-gray-800">{m.title}</div>
-            <div className="text-xs text-gray-500">Module #{m.id}</div>
           </button>
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 mr-2">
+              <button
+                onClick={() => moveModule(m.id, "up")}
+                disabled={i === 0}
+                className={`px-2 py-1 text-xs rounded-md border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed`}
+                title="Di chuyển lên"
+              >
+                ↑
+              </button>
+              <button
+                onClick={() => moveModule(m.id, "down")}
+                disabled={i === modules.length - 1}
+                className={`px-2 py-1 text-xs rounded-md border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed`}
+                title="Di chuyển xuống"
+              >
+                ↓
+              </button>
+            </div>
             <button
               onClick={() => editModule(m)}
               className="px-3 py-1 text-sm rounded-md border bg-white hover:bg-gray-50"
-              title="Edit"
+              title="Chỉnh sửa"
             >
-              Edit
+              Chỉnh sửa
             </button>
             <button
               onClick={() => deleteModule(m.id)}
               className="px-3 py-1 text-sm rounded-md border text-red-600 bg-white hover:bg-gray-50"
-              title="Delete"
+              title="Xóa"
             >
-              Delete
+              Xóa
             </button>
           </div>
         </li>

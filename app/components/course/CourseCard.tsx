@@ -9,6 +9,7 @@ interface CourseCardProps {
   showActions?: boolean;
   userRole?: string;
   currentUserId?: number;
+  hideEnroll?: boolean;
   onEdit?: (course: Course) => void;
   onDelete?: (courseId: number) => void;
   onPublish?: (courseId: number) => void;
@@ -22,6 +23,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   showActions = false,
   userRole,
   currentUserId,
+  hideEnroll = false,
   onEdit,
   onDelete,
   onPublish,
@@ -156,7 +158,8 @@ export const CourseCard: React.FC<CourseCardProps> = ({
             View Details
           </Link>
 
-          {userRole === "ROLE_STUDENT" &&
+          {!hideEnroll &&
+            userRole === "ROLE_STUDENT" &&
             course.status === "PUBLISHED" &&
             course.approval_status === "APPROVED" && (
               <button

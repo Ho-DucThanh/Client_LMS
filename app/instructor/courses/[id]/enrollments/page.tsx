@@ -119,9 +119,9 @@ export default function CourseEnrollmentsPage() {
     <RoleGuard roles={["ROLE_TEACHER", "ROLE_ADMIN"]}>
       <div className="min-h-screen bg-gray-50">
         <Heading
-          title="Course Enrollments"
-          description="Approve or manage enrollments"
-          keywords="enrollments,manage"
+          title="Ghi danh khóa học"
+          description="Phê duyệt và quản lý ghi danh"
+          keywords="ghi danh,quan ly"
         />
         <Header />
         <div className="container mx-auto px-4 py-8 space-y-6">
@@ -133,20 +133,20 @@ export default function CourseEnrollmentsPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold">
-                    {course?.title || "Course"}
+                    {course?.title || "Khóa học"}
                   </h2>
                   <div className="text-sm text-gray-500">
                     {course?.description}
                   </div>
                   <div className="mt-2 text-sm text-gray-600">
                     <span className="mr-2">
-                      Total students: <b>{stats?.total ?? 0}</b>
+                      Tổng học viên: <b>{stats?.total ?? 0}</b>
                     </span>
                     <span className="mr-2 text-green-700">
-                      Active: <b>{stats?.active ?? 0}</b>
+                      Đang học: <b>{stats?.active ?? 0}</b>
                     </span>
                     <span className="mr-2 text-blue-700">
-                      Completed: <b>{stats?.completed ?? 0}</b>
+                      Hoàn thành: <b>{stats?.completed ?? 0}</b>
                     </span>
                   </div>
                 </div>
@@ -156,14 +156,14 @@ export default function CourseEnrollmentsPage() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search students by name or email"
+                  placeholder="Tìm học viên theo tên hoặc email"
                   className="px-3 py-2 border rounded-lg text-sm w-64"
                 />
                 <button
                   onClick={exportCsv}
                   className="px-4 py-2 rounded bg-gray-800 text-white"
                 >
-                  Export CSV
+                  Xuất CSV
                 </button>
               </div>
             </div>
@@ -202,21 +202,21 @@ export default function CourseEnrollmentsPage() {
                           : "bg-yellow-100 text-yellow-800"
                       }`}
                     >
-                      {status}
+                      {status === "COMPLETED" ? "Đã hoàn thành" : "Đang học"}
                     </span>
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/instructor/courses/${courseId}/enrollments/${e.id}/progress`}
                         className="px-3 py-1 rounded border text-sm hover:bg-gray-50"
                       >
-                        View Progress
+                        Xem tiến độ
                       </Link>
 
                       <Link
                         href={`/instructor/courses/${courseId}/enrollments/${e.id}/submissions?student=${e.student.id}`}
                         className="px-3 py-1 rounded border text-sm hover:bg-gray-50"
                       >
-                        Submissions
+                        Bài nộp
                       </Link>
                     </div>
                   </div>
