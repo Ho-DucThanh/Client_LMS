@@ -213,7 +213,11 @@ export default function CourseEnrollmentsPage() {
                       </Link>
 
                       <Link
-                        href={`/instructor/courses/${courseId}/enrollments/${e.id}/submissions?student=${e.student.id}`}
+                        href={`/instructor/courses/${courseId}/enrollments/${
+                          e.id
+                        }/submissions?student=${encodeURIComponent(
+                          e?.student?.id ?? e?.student_id
+                        )}`}
                         className="px-3 py-1 rounded border text-sm hover:bg-gray-50"
                       >
                         Bài nộp

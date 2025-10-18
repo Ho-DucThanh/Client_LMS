@@ -1,21 +1,15 @@
-import { baseApi } from "./api-base";
-
+// Forum feature removed: provide no-op API to preserve imports without functionality.
 export const forumService = {
-  // Forum API methods
-  async getForumPosts(courseId?: number) {
-    const queryParams = courseId ? `?courseId=${courseId}` : "";
-    return baseApi.get(`/forum/posts${queryParams}`);
+  async getForumPosts(): Promise<never> {
+    throw new Error("Forum feature has been removed");
   },
-
-  async createForumPost(postData: any) {
-    return baseApi.post("/forum/posts", postData);
+  async createForumPost(): Promise<never> {
+    throw new Error("Forum feature has been removed");
   },
-
-  async getForumComments(postId: number) {
-    return baseApi.get(`/forum/posts/${postId}/comments`);
+  async getForumComments(): Promise<never> {
+    throw new Error("Forum feature has been removed");
   },
-
-  async createForumComment(postId: number, commentData: any) {
-    return baseApi.post(`/forum/posts/${postId}/comments`, commentData);
+  async createForumComment(): Promise<never> {
+    throw new Error("Forum feature has been removed");
   },
 };

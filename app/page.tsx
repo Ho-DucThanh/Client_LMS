@@ -1,13 +1,12 @@
 "use client";
-import React, { FC, useState } from "react";
+import React, { FC } from "react";
 import Heading from "./utils/Heading";
 import Header from "./components/Header";
 import Hero from "./components/Hero";
-import Onboarding from "./components/Onboarding";
 
 interface Props {}
 
-const Page: FC<Props> = (props) => {
+const Page: FC<Props> = () => {
   return (
     <div>
       <Heading
@@ -17,7 +16,6 @@ const Page: FC<Props> = (props) => {
       />
       <Header />
       <Hero />
-      <Onboarding />
     </div>
   );
 };

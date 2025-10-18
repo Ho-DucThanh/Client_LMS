@@ -108,16 +108,7 @@ export interface PaginatedResponse<T> extends ApiResponse<T> {
   meta: PaginationMeta;
 }
 
-// Forum interfaces
-export interface ForumPost {
-  id: number;
-  title: string;
-  content: string;
-  author_id: number;
-  course_id?: number;
-  created_at: string;
-  updated_at: string;
-}
+// Forum interfaces removed
 
 // Notification interfaces
 export interface Notification {

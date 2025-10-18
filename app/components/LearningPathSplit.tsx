@@ -1,20 +1,25 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { apiService } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { CourseCard } from "./course/CourseCard";
 
-const STAGES = ["FOUNDATION", "INTERMEDIATE", "ADVANCED", "SPECIALIZATION"];
+const STAGES = ["FOUNDATION", "INTERMEDIATE", "ADVANCED"];
 const STAGE_LABELS: Record<string, string> = {
   FOUNDATION: "Nền tảng",
   INTERMEDIATE: "Trung cấp",
   ADVANCED: "Nâng cao",
-  SPECIALIZATION: "Chuyên sâu",
+  // SPECIALIZATION removed per requirement
 };
 
 // Split layout version of learning path (Q&A left, results right)
 export default function LearningPathSplit() {
   const { user } = useAuth();
+  // Persisted session state key (per user)
+  const storageKey = useMemo(
+    () => (user?.id ? `lp:state:${user.id}` : `lp:state:guest`),
+    [user?.id]
+  );
   const [goal, setGoal] = useState("");
   const [level, setLevel] = useState("Mới bắt đầu");
   const [mode, setMode] = useState<"guided" | "direct">("guided");
@@ -43,6 +48,74 @@ export default function LearningPathSplit() {
   const [beginnerInput, setBeginnerInput] = useState("");
   const [beginnerCounter, setBeginnerCounter] = useState(0);
   const [beginnerFinalizing, setBeginnerFinalizing] = useState(false);
+
+  // Hydrate from sessionStorage so data persists when navigating away/back
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const raw = window.sessionStorage.getItem(storageKey);
+      if (!raw) return;
+      const s = JSON.parse(raw || "null");
+      if (!s || typeof s !== "object") return;
+      if (typeof s.goal === "string") setGoal(s.goal);
+      if (typeof s.level === "string") setLevel(s.level);
+      if (s.mode === "guided" || s.mode === "direct") setMode(s.mode);
+      if (typeof s.chatMode === "boolean") setChatMode(s.chatMode);
+      if (typeof s.prefs === "string") setPrefs(s.prefs);
+      if (Array.isArray(s.prefTags)) setPrefTags(s.prefTags);
+      if (s.rec) setRec(s.rec);
+      if (s.coursesMeta) setCoursesMeta(s.coursesMeta);
+      if (s.notInterested) setNotInterested(s.notInterested);
+      if (Array.isArray(s.path)) setPath(s.path);
+      if (typeof s.showCareers === "boolean") setShowCareers(s.showCareers);
+      if (typeof s.showStages === "boolean") setShowStages(s.showStages);
+      if (typeof s.answer === "string") setAnswer(s.answer);
+      if (typeof s.beginnerFlow === "boolean") setBeginnerFlow(s.beginnerFlow);
+      if (Array.isArray(s.beginnerClarifications))
+        setBeginnerClarifications(s.beginnerClarifications);
+    } catch {}
+  }, [storageKey]);
+
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const dump = {
+        goal,
+        level,
+        mode,
+        chatMode,
+        prefs,
+        prefTags,
+        rec,
+        coursesMeta,
+        notInterested,
+        path,
+        showCareers,
+        showStages,
+        answer,
+        beginnerFlow,
+        beginnerClarifications,
+      };
+      window.sessionStorage.setItem(storageKey, JSON.stringify(dump));
+    } catch {}
+  }, [
+    storageKey,
+    goal,
+    level,
+    mode,
+    chatMode,
+    prefs,
+    prefTags,
+    rec,
+    coursesMeta,
+    notInterested,
+    path,
+    showCareers,
+    showStages,
+    answer,
+    beginnerFlow,
+    beginnerClarifications,
+  ]);
 
   // hydrate saved path
   useEffect(() => {
@@ -737,70 +810,127 @@ export default function LearningPathSplit() {
                 {showStages && (
                   <div className="space-y-5">
                     {STAGES.map((s) => (
-                      <div key={s} className="bg-gray-50 p-3 rounded border">
-                        <div className="flex items-center justify-between mb-2">
-                          <h5 className="font-semibold text-sm">
+                      <div
+                        key={s}
+                        className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <h5 className="font-semibold text-base text-gray-900">
                             {STAGE_LABELS[s]}
                           </h5>
                           <span className="text-xs text-gray-500">
                             {(grouped[s] || []).length} khóa học
                           </span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                           {(grouped[s] || []).map((c: any, idx: number) => {
                             const meta = coursesMeta[c.id] || c;
                             const key = `course-${c.id}-${idx}`;
                             const matchCount = c.matchCount || 0;
                             const matchPct = Number.isFinite(c.matchScore)
-                              ? c.matchScore
+                              ? Math.max(
+                                  0,
+                                  Math.min(100, Math.round(c.matchScore))
+                                )
                               : matchCount > 0
                               ? Math.min(
                                   100,
                                   Math.round((matchCount / 3) * 100)
                                 )
                               : 0;
+                            const title = meta?.title || `Khóa học #${c.id}`;
+                            const subtitle =
+                              meta?.subtitle || meta?.short_description || "";
+                            const tags: string[] = Array.isArray(
+                              c.matchedTopics
+                            )
+                              ? c.matchedTopics
+                              : Array.isArray(meta?.tags)
+                              ? meta.tags
+                              : Array.isArray(meta?.topics)
+                              ? meta.topics
+                              : [];
                             return (
                               <div
                                 key={key}
-                                className="bg-white border rounded p-2"
+                                className="group h-full flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition"
                               >
-                                <CourseCard
-                                  course={meta}
-                                  userRole={user?.role}
-                                  hideEnroll={true}
-                                />
-                                {matchCount > 0 && (
-                                  <div className="mt-1">
-                                    <div className="text-[10px] text-gray-500 mb-0.5">
-                                      Phù hợp: {matchCount} chủ đề
+                                <div className="relative aspect-[16/9] bg-gray-100 overflow-hidden">
+                                  {meta?.thumbnail_url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={meta.thumbnail_url}
+                                      alt={title}
+                                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400">
+                                      Không có ảnh
                                     </div>
-                                    <div className="w-full bg-gray-200 h-1 rounded overflow-hidden">
-                                      <div
-                                        className="h-1 bg-blue-500"
-                                        style={{ width: `${matchPct}%` }}
-                                      />
-                                    </div>
+                                  )}
+                                  <div className="absolute top-2 left-2 px-2 py-0.5 text-[10px] rounded-full bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wide">
+                                    {STAGE_LABELS[s]}
                                   </div>
-                                )}
-                                <div className="mt-2 flex flex-wrap gap-1">
-                                  <button
-                                    onClick={() => openExplain(c)}
-                                    className="px-2 py-0.5 border rounded text-[11px]"
-                                  >
-                                    Vì sao?
-                                  </button>
-                                  <button
-                                    onClick={() => handleNotInterested(c.id)}
-                                    className="px-2 py-0.5 border rounded text-[11px]"
-                                  >
-                                    Ẩn
-                                  </button>
-                                  <button
-                                    onClick={() => handleAddToPath(c.id)}
-                                    className="px-2 py-0.5 bg-yellow-500 text-white rounded text-[11px]"
-                                  >
-                                    Lưu
-                                  </button>
+                                </div>
+                                <div className="p-4 flex-1 flex flex-col">
+                                  <div className="min-h-[52px]">
+                                    <div
+                                      className="font-semibold text-base text-gray-900 leading-snug line-clamp-2"
+                                      title={title}
+                                    >
+                                      {title}
+                                    </div>
+                                    {subtitle && (
+                                      <div className="mt-1 text-sm text-gray-600 line-clamp-2">
+                                        {subtitle}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {tags && tags.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-1.5">
+                                      {tags
+                                        .slice(0, 3)
+                                        .map((t: string, i: number) => (
+                                          <span
+                                            key={i}
+                                            className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs"
+                                          >
+                                            {t}
+                                          </span>
+                                        ))}
+                                    </div>
+                                  )}
+                                  {matchCount > 0 && (
+                                    <div className="mt-4">
+                                      <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
+                                        <span>
+                                          Phù hợp: {matchCount} chủ đề
+                                        </span>
+                                        <span>{matchPct}%</span>
+                                      </div>
+                                      <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-1.5 bg-gradient-to-r from-blue-400 to-blue-600"
+                                          style={{ width: `${matchPct}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                  <div className="mt-4 flex items-center gap-2 pt-1">
+                                    <Link
+                                      href={`/courses/${c.id}`}
+                                      className="flex-1 text-center rounded-lg bg-blue-600 text-white text-sm font-medium px-3 py-2.5 hover:bg-blue-700 shadow-sm"
+                                    >
+                                      View Details
+                                    </Link>
+                                    <button
+                                      onClick={() => handleAddToPath(c.id)}
+                                      className="px-2.5 py-1.5 text-xs rounded bg-yellow-500 text-white hover:bg-yellow-600"
+                                    >
+                                      Lưu
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             );

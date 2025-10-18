@@ -171,6 +171,10 @@ class ApiService {
     return this.post(`/recommendations/my-paths`, {});
   }
 
+  async deleteLearningPath(id: number) {
+    return this.delete(`/recommendations/my-paths/${id}`);
+  }
+
   async getEnrollmentProgress(enrollmentId: number) {
     return this.get(`/enrollments/${enrollmentId}/progress`);
   }
@@ -208,23 +212,7 @@ class ApiService {
     return this.get("/assignments/my-submissions");
   }
 
-  // Forum API methods
-  async getForumPosts(courseId?: number) {
-    const queryParams = courseId ? `?courseId=${courseId}` : "";
-    return this.get(`/forum/posts${queryParams}`);
-  }
-
-  async createForumPost(postData: any) {
-    return this.post("/forum/posts", postData);
-  }
-
-  async getForumComments(postId: number) {
-    return this.get(`/forum/posts/${postId}/comments`);
-  }
-
-  async createForumComment(postId: number, commentData: any) {
-    return this.post(`/forum/posts/${postId}/comments`, commentData);
-  }
+  // Forum APIs removed
 
   // Notification API methods
   async getNotifications() {

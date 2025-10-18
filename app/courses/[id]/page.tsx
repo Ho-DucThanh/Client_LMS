@@ -20,6 +20,7 @@ import { enrollmentService } from "../../services/api-enrollment";
 import { moduleService } from "../../services/api-modules";
 import { lessonService } from "../../services/api-lessons";
 import { reviewService } from "../../services/api-review";
+import { toast } from "react-hot-toast";
 
 interface CourseDto {
   id: number;
@@ -77,6 +78,41 @@ const CourseDetailPage = () => {
   }>({ students: 0, rating: 0, ratings: 0 });
   const [reviews, setReviews] = useState<any[]>([]);
   // only show reviews authored by current user
+
+  // Determine if current user is a teacher/lecturer (cannot enroll)
+  const isTeacherRole = (() => {
+    const role = (user as any)?.role;
+    const roles: any[] = ((user as any)?.roles || []) as any[];
+    const userRoles: any[] = ((user as any)?.userRoles || []) as any[];
+    const all = [
+      role,
+      ...roles,
+      ...userRoles.map((ur: any) => ur?.role?.role_name),
+    ]
+      .filter(Boolean)
+      .map((r: any) => String(r).toUpperCase());
+    return (
+      all.includes("ROLE_TEACHER") ||
+      all.includes("TEACHER") ||
+      all.includes("LECTURER") ||
+      all.includes("ROLE_LECTURER")
+    );
+  })();
+
+  // Determine if current user is an admin (cannot enroll)
+  const isAdminRole = (() => {
+    const role = (user as any)?.role;
+    const roles: any[] = ((user as any)?.roles || []) as any[];
+    const userRoles: any[] = ((user as any)?.userRoles || []) as any[];
+    const all = [
+      role,
+      ...roles,
+      ...userRoles.map((ur: any) => ur?.role?.role_name),
+    ]
+      .filter(Boolean)
+      .map((r: any) => String(r).toUpperCase());
+    return all.includes("ROLE_ADMIN") || all.includes("ADMIN");
+  })();
 
   useEffect(() => {
     if (params.id) {
@@ -172,6 +208,20 @@ const CourseDetailPage = () => {
       return;
     }
 
+    // Block teacher accounts from enrolling
+    if (isTeacherRole) {
+      toast.error("Tài khoản giảng viên không thể đăng ký khóa học.");
+      setShowEnrollModal(false);
+      return;
+    }
+
+    // Block admin accounts from enrolling
+    if (isAdminRole) {
+      toast.error("Tài khoản quản trị không thể đăng ký khóa học.");
+      setShowEnrollModal(false);
+      return;
+    }
+
     // Prevent enrolling into unpublished courses from the client-side
     if ((course as any)?.status !== "PUBLISHED") {
       setShowEnrollModal(false);
@@ -192,9 +242,9 @@ const CourseDetailPage = () => {
         msg.toLowerCase().includes("publish") ||
         msg.toLowerCase().includes("approve")
       ) {
-        alert(msg);
+        toast.error(msg);
       } else {
-        alert("Failed to enroll: " + msg);
+        toast.error("Không thể đăng ký khóa học: " + msg);
       }
     } finally {
       setEnrolling(false);
@@ -295,13 +345,30 @@ const CourseDetailPage = () => {
                     </div>
                     <button
                       onClick={() => {
+                        if (isTeacherRole) {
+                          toast.error(
+                            "Tài khoản giảng viên không thể đăng ký khóa học."
+                          );
+                          return;
+                        }
+                        if (isAdminRole) {
+                          toast.error(
+                            "Tài khoản quản trị không thể đăng ký khóa học."
+                          );
+                          return;
+                        }
                         if ((course as any)?.status !== "PUBLISHED") {
                           setShowNotPublishedModal(true);
                           return;
                         }
                         setShowEnrollModal(true);
                       }}
-                      className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                      disabled={isTeacherRole || isAdminRole}
+                      className={`w-full px-6 py-3 rounded-lg transition-colors font-semibold ${
+                        isTeacherRole || isAdminRole
+                          ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
+                      }`}
                     >
                       Enroll Now
                     </button>

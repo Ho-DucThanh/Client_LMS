@@ -88,6 +88,9 @@ const Header = () => {
     }
   };
 
+  const isStudentRole =
+    !!user && (user.role === "ROLE_STUDENT" || user.role === "STUDENT");
+
   return (
     <div className="sticky top-0 z-50">
       {unreadCount > 0 && notifications[0] && (
@@ -133,12 +136,7 @@ const Header = () => {
               >
                 Courses
               </Link>
-              <Link
-                href="/forum"
-                className="text-gray-700 hover:text-blue-600 transition-colors"
-              >
-                Forum
-              </Link>
+              {/* Forum link removed */}
               {isAuthenticated && user?.role === "ADMIN" && (
                 <Link
                   href="/admin"
@@ -247,6 +245,15 @@ const Header = () => {
                   >
                     Dashboard
                   </Link>
+                  {isStudentRole && (
+                    <Link
+                      href="/my-paths"
+                      className="text-gray-700 hover:text-blue-600 transition-colors"
+                      title="Xem lại các lộ trình đã lưu"
+                    >
+                      My Paths
+                    </Link>
+                  )}
                   <div className="relative">
                     <button
                       onClick={() =>
@@ -339,13 +346,7 @@ const Header = () => {
                 >
                   Courses
                 </Link>
-                <Link
-                  href="/forum"
-                  className="text-gray-700 hover:text-blue-600 transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Forum
-                </Link>
+                {/* Forum link removed */}
 
                 {/* Mobile Auth */}
                 {isAuthenticated ? (
@@ -357,6 +358,15 @@ const Header = () => {
                     >
                       Dashboard
                     </Link>
+                    {isStudentRole && (
+                      <Link
+                        href="/my-paths"
+                        className="text-gray-700 hover:text-blue-600 transition-colors"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        My Paths
+                      </Link>
+                    )}
                     <div className="flex items-center space-x-2 text-gray-700">
                       <UserIcon className="h-6 w-6" />
                       <span>{user?.firstName}</span>

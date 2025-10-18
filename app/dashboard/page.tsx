@@ -11,13 +11,27 @@ import {
 } from "@heroicons/react/24/outline";
 import Heading from "../utils/Heading";
 import Header from "../components/Header";
-import LearningPath from "../components/LearningPath"; // legacy (may keep for fallback)
 import LearningPathSplit from "../components/LearningPathSplit";
 import { useAuth } from "../contexts/AuthContext";
 import { enrollmentService } from "../services/api-enrollment";
 import { courseService } from "../services/api-course";
 import { reportsService } from "../services/api-reports";
 import { Enrollment } from "../types";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip as ReTooltip,
+  Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  LineChart,
+  Line,
+} from "recharts";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -988,97 +1002,240 @@ export default function StudentDashboard() {
                       </div>
                     </div>
 
-                    <div className="rounded-xl border bg-white p-5 shadow-sm">
-                      <h3 className="font-semibold text-gray-900 mb-4">
-                        Khóa học của bạn (Top 10)
-                      </h3>
-                      <div className="divide-y">
-                        {((reports.courses?.data || []) as any[]).map(
-                          (row: any, _, arr: any[]) => {
-                            const maxEnroll = Math.max(
-                              1,
-                              ...arr.map((r: any) => Number(r.enrollments || 0))
-                            );
-                            const val = Number(row.enrollments || 0);
-                            const width = Math.round((val / maxEnroll) * 100);
-                            return (
-                              <div key={row.id} className="py-3">
-                                <div className="flex items-center justify-between gap-4 text-sm">
-                                  <div className="flex-1 truncate pr-3 text-gray-900 font-medium">
-                                    {row.title}
-                                  </div>
-                                  <div className="w-28 text-right text-gray-700">
-                                    Ghi danh: {val}
-                                  </div>
-                                  <div className="w-36 text-right text-gray-700">
-                                    Đánh giá TB:{" "}
-                                    {Number(row.avg_rating || 0).toFixed(2)}
-                                  </div>
-                                </div>
-                                <div className="mt-2 h-2 w-full rounded-full bg-gray-200">
-                                  <div
-                                    className="h-2 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600"
-                                    style={{ width: `${width}%` }}
-                                  />
-                                </div>
-                              </div>
-                            );
-                          }
-                        )}
+                    {/* Charts row: Pie (enrollment distribution) and Bar (top courses) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="rounded-xl border bg-white p-5 shadow-sm">
+                        <h3 className="font-semibold text-gray-900 mb-4">
+                          Phân bố trạng thái ghi danh
+                        </h3>
+                        <div className="h-72">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={(() => {
+                                  const e =
+                                    (reports as any)?.overview?.enrollments ||
+                                    {};
+                                  return [
+                                    {
+                                      name: "Đang học",
+                                      value: Number(e.active || 0),
+                                      color: "#3b82f6",
+                                    },
+                                    {
+                                      name: "Hoàn thành",
+                                      value: Number(e.completed || 0),
+                                      color: "#10b981",
+                                    },
+                                    {
+                                      name: "Đã hủy",
+                                      value: Number(e.dropped || 0),
+                                      color: "#9ca3af",
+                                    },
+                                  ];
+                                })()}
+                                dataKey="value"
+                                nameKey="name"
+                                innerRadius={60}
+                                outerRadius={100}
+                                paddingAngle={3}
+                              >
+                                {(() => {
+                                  const e =
+                                    (reports as any)?.overview?.enrollments ||
+                                    {};
+                                  const data = [
+                                    {
+                                      name: "Đang học",
+                                      value: Number(e.active || 0),
+                                      color: "#3b82f6",
+                                    },
+                                    {
+                                      name: "Hoàn thành",
+                                      value: Number(e.completed || 0),
+                                      color: "#10b981",
+                                    },
+                                    {
+                                      name: "Đã hủy",
+                                      value: Number(e.dropped || 0),
+                                      color: "#9ca3af",
+                                    },
+                                  ];
+                                  return data.map((entry, index) => (
+                                    <Cell
+                                      key={`cell-${index}`}
+                                      fill={entry.color}
+                                    />
+                                  ));
+                                })()}
+                              </Pie>
+                              <ReTooltip
+                                formatter={(val: any) => [val, "Số lượng"]}
+                              />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border bg-white p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-semibold text-gray-900">
+                            Khóa học của bạn (Top 10)
+                          </h3>
+                          <span className="text-xs text-gray-500">
+                            Theo số lượt ghi danh
+                          </span>
+                        </div>
+                        <div className="h-72">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={(() => {
+                                const rows = ((reports as any)?.courses?.data ||
+                                  []) as any[];
+                                return rows.map((r) => ({
+                                  name:
+                                    String(r.title || "").slice(0, 18) +
+                                    (String(r.title || "").length > 18
+                                      ? "…"
+                                      : ""),
+                                  enrollments: Number(r.enrollments || 0),
+                                  rating: Number(r.avg_rating || 0),
+                                }));
+                              })()}
+                              margin={{
+                                top: 10,
+                                right: 20,
+                                left: 0,
+                                bottom: 0,
+                              }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="name"
+                                tick={{ fontSize: 12 }}
+                                interval={0}
+                                angle={-10}
+                                height={40}
+                                textAnchor="end"
+                              />
+                              <YAxis />
+                              <ReTooltip
+                                formatter={(v: any, n: any) => [
+                                  v,
+                                  n === "enrollments"
+                                    ? "Ghi danh"
+                                    : "Đánh giá TB",
+                                ]}
+                              />
+                              <Legend />
+                              <Bar
+                                dataKey="enrollments"
+                                name="Ghi danh"
+                                fill="#10b981"
+                                radius={[4, 4, 0, 0]}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
                     </div>
 
+                    {/* Trends line chart */}
                     <div className="rounded-xl border bg-white p-5 shadow-sm">
                       <h3 className="font-semibold text-gray-900 mb-4">
-                        Xu hướng
+                        Xu hướng theo thời gian
                       </h3>
                       {!trends ? (
                         <div className="text-sm text-gray-600">
                           Đang tải xu hướng...
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                          {(
-                            ["enrollments", "submissions", "reviews"] as const
-                          ).map((key) => {
-                            const labels: Record<string, string> = {
-                              enrollments: "Ghi danh",
-                              submissions: "Bài nộp",
-                              reviews: "Đánh giá",
-                            };
-                            const series = (trends as any)[key] || [];
-                            const max = Math.max(
-                              1,
-                              ...series.map((s: any) => Number(s.count || 0))
-                            );
-                            return (
-                              <div
-                                key={key}
-                                className="rounded-lg bg-gray-50 p-4"
-                              >
-                                <div className="text-sm font-medium text-gray-800 mb-2">
-                                  {labels[key]}
-                                </div>
-                                <div className="flex items-end gap-1.5 h-28">
-                                  {series.map((s: any) => {
-                                    const h =
-                                      (Number(s.count || 0) / max) * 100;
-                                    return (
-                                      <div
-                                        key={s.bucket}
-                                        title={`${s.bucket}: ${s.count}`}
-                                        className="w-2.5 rounded-t-md bg-gradient-to-t from-emerald-300 to-emerald-600"
-                                        style={{ height: `${h}%` }}
-                                      />
-                                    );
-                                  })}
-                                </div>
-                                <div className="mt-1 text-[10px] text-gray-500 truncate">
-                                  {series.map((s: any) => s.bucket).join("  ")}
-                                </div>
-                              </div>
-                            );
-                          })}
+                        <div className="h-80">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={(() => {
+                                const e = ((trends as any).enrollments ||
+                                  []) as any[];
+                                const s = ((trends as any).submissions ||
+                                  []) as any[];
+                                const r = ((trends as any).reviews ||
+                                  []) as any[];
+                                const map = new Map<
+                                  string,
+                                  {
+                                    bucket: string;
+                                    enrollments?: number;
+                                    submissions?: number;
+                                    reviews?: number;
+                                  }
+                                >();
+                                for (const row of e) {
+                                  map.set(row.bucket, {
+                                    bucket: row.bucket,
+                                    enrollments: Number(row.count || 0),
+                                  });
+                                }
+                                for (const row of s) {
+                                  const prev = map.get(row.bucket) || {
+                                    bucket: row.bucket,
+                                  };
+                                  map.set(row.bucket, {
+                                    ...prev,
+                                    submissions: Number(row.count || 0),
+                                  });
+                                }
+                                for (const row of r) {
+                                  const prev = map.get(row.bucket) || {
+                                    bucket: row.bucket,
+                                  };
+                                  map.set(row.bucket, {
+                                    ...prev,
+                                    reviews: Number(row.count || 0),
+                                  });
+                                }
+                                return Array.from(map.values()).sort((a, b) =>
+                                  a.bucket.localeCompare(b.bucket)
+                                );
+                              })()}
+                              margin={{
+                                top: 10,
+                                right: 20,
+                                left: 0,
+                                bottom: 0,
+                              }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />
+                              <YAxis />
+                              <ReTooltip />
+                              <Legend />
+                              <Line
+                                type="monotone"
+                                dataKey="enrollments"
+                                name="Ghi danh"
+                                stroke="#3b82f6"
+                                strokeWidth={2}
+                                dot={false}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="submissions"
+                                name="Bài nộp"
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                dot={false}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="reviews"
+                                name="Đánh giá"
+                                stroke="#f59e0b"
+                                strokeWidth={2}
+                                dot={false}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
                         </div>
                       )}
                     </div>
